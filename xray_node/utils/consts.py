@@ -1,0 +1,2 @@
+XRAY_GITHUB_USER = "XTLS"
+XRAY_GITHUB_REPO = "Xray-core"
