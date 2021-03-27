@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -52,7 +53,24 @@ async def _get_xray_zip_hash(hash_url: str) -> str:
     return xray_hash
 
 
-async def _download_xray(install_path: Path) -> bool:
+def _get_file_md5(fn: Path) -> str:
+    """
+    获取文件的md5值
+    :param fn: 文件路径
+    :return: md5校验值
+    """
+    m = hashlib.md5()  # 创建md5对象
+    with open(fn, "rb") as fobj:
+        while True:
+            data = fobj.read(4096)
+            if not data:
+                break
+            m.update(data)  # 更新md5对象
+
+    return m.hexdigest()  # 返回md5对象
+
+
+async def _download_xray_zip(install_path: Path) -> bool:
     """
     下载xray-core
     :param install_path:
@@ -71,11 +89,22 @@ async def _download_xray(install_path: Path) -> bool:
         xray_zip_url = f"https://github.com/XTLS/Xray-core/releases/download/{latest_tag}/Xray-linux-64.zip"
         xray_zip_hash_url = f"https://github.com/XTLS/Xray-core/releases/download/{latest_tag}/Xray-linux-64.zip.dgst"
 
-        md5_hash = _get_xray_zip_hash(hash_url=xray_zip_hash_url)
+        md5_hash = await _get_xray_zip_hash(hash_url=xray_zip_hash_url)
 
-        req = await http.client.get(url=xray_zip_url)
+        target = install_path / "Xray-linux-64.zip"
+        download_success = await http.download(url=xray_zip_url, target=target)
+        if download_success:
+            if md5_hash == _get_file_md5(fn=target):
+                logger.info(f"下载 xray-core 成功，md5 校验成功")
+                return True
+            else:
+                logger.warning(f"下载 xray-core 成功，但 md5 校验失败")
+                return False
+        else:
+            return False
     except Exception as e:
         logger.exception(f"下载 xray-core 失败，{e}")
+        return False
 
 
 async def install_xray(install_path: Path = None) -> bool:
