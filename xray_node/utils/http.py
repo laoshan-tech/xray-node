@@ -11,7 +11,7 @@ async def download(url: str, target: Path) -> bool:
     """
     下载文件
     :param url:
-    :param target:
+    :param target: 保存文件路径
     :return: 是否成功
     """
     with open(target, "wb") as f:

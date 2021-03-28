@@ -14,7 +14,7 @@ class XrayFile(object):
     def __init__(self, install_path: Path = None, use_cdn: bool = False):
         """
         xray-core文件目录相关
-        :param install_path:
+        :param install_path: 安装目录
         :param use_cdn: 是否使用CDN加速下载
         """
         if install_path is None:
@@ -28,10 +28,18 @@ class XrayFile(object):
 
     @property
     def xray_install_path(self) -> Path:
+        """
+        xray-core安装目录
+        :return:
+        """
         return self.path
 
     @property
     def xray_exe_fn(self) -> Path:
+        """
+        xray-core可执行文件路径
+        :return:
+        """
         if self.platform == "windows":
             return self.path / "xray.exe"
         else:
@@ -39,10 +47,18 @@ class XrayFile(object):
 
     @property
     def xray_zip_fn(self) -> Path:
+        """
+        xray-core压缩包路径
+        :return:
+        """
         return self.path / f"xray-{self.platform}-{self.arch}.zip"
 
     @property
     def xray_download_url_fmt(self) -> str:
+        """
+        xray-core下载URL，需要填充tag
+        :return:
+        """
         if self.use_cdn:
             return f"https://download.fastgit.org/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip"
         else:
@@ -50,6 +66,10 @@ class XrayFile(object):
 
     @property
     def xray_download_hash_url_fmt(self) -> str:
+        """
+        xray-core压缩包Hash下载URL，需要填充tag
+        :return:
+        """
         if self.use_cdn:
             return f"https://download.fastgit.org/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip.dgst"
         else:
@@ -137,15 +157,14 @@ async def _download_xray_zip(xray_f: XrayFile) -> bool:
 
         result = req.json()
         latest_tag = result["tag_name"]
-        xray_zip_url = xray_f.xray_download_url_fmt.format(tag=latest_tag)
-        xray_zip_hash_url = xray_f.xray_download_hash_url_fmt.format(tag=latest_tag)
 
-        md5_hash = await _get_xray_zip_hash(hash_url=xray_zip_hash_url)
+        md5_hash = await _get_xray_zip_hash(hash_url=xray_f.xray_download_hash_url_fmt.format(tag=latest_tag))
 
-        target = xray_f.xray_zip_fn
-        download_success = await http.download(url=xray_zip_url, target=target)
+        download_success = await http.download(
+            url=xray_f.xray_download_url_fmt.format(tag=latest_tag), target=xray_f.xray_zip_fn
+        )
         if download_success:
-            if md5_hash == _get_file_md5(fn=target):
+            if md5_hash == _get_file_md5(fn=xray_f.xray_zip_fn):
                 logger.info(f"下载 xray-core 成功，md5 校验成功")
                 return True
             else:
