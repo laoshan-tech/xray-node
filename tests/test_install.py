@@ -19,4 +19,4 @@ class TestInstall(object):
 
     @pytest.mark.asyncio
     async def test_install(self):
-        assert await install.install_xray() is True
+        assert await install.install_xray(use_cdn=True) is True

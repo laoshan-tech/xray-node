@@ -11,15 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 class XrayFile(object):
-    def __init__(self, install_path: Path = None):
+    def __init__(self, install_path: Path = None, use_cdn: bool = False):
         """
         xray-core文件目录相关
         :param install_path:
+        :param use_cdn: 是否使用CDN加速下载
         """
         if install_path is None:
             self.path = Path().home() / "xray-node"
         else:
             self.path = install_path
+
+        self.use_cdn = use_cdn
+        self.platform = "macos" if platform.system().lower() == "darwin" else platform.system().lower()
+        self.arch = 64 if platform.machine().endswith("64") else 32
 
     @property
     def xray_install_path(self) -> Path:
@@ -27,25 +32,28 @@ class XrayFile(object):
 
     @property
     def xray_exe_fn(self) -> Path:
-        return self.path / "xray"
+        if self.platform == "windows":
+            return self.path / "xray.exe"
+        else:
+            return self.path / "xray"
 
     @property
     def xray_zip_fn(self) -> Path:
-        p = platform.system().lower()
-        arch = 64 if platform.machine().endswith("64") else 32
-        return self.path / f"xray-{p}-{arch}.zip"
+        return self.path / f"xray-{self.platform}-{self.arch}.zip"
 
     @property
     def xray_download_url_fmt(self) -> str:
-        p = "macos" if platform.system().lower() == "darwin" else platform.system().lower()
-        arch = 64 if platform.machine().endswith("64") else 32
-        return f"https://github.com/XTLS/Xray-core/releases/download/{{tag}}/Xray-{p}-{arch}.zip"
+        if self.use_cdn:
+            return f"https://download.fastgit.org/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip"
+        else:
+            return f"https://github.com/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip"
 
     @property
     def xray_download_hash_url_fmt(self) -> str:
-        p = "macos" if platform.system().lower() == "darwin" else platform.system().lower()
-        arch = 64 if platform.machine().endswith("64") else 32
-        return f"https://github.com/XTLS/Xray-core/releases/download/{{tag}}/Xray-{p}-{arch}.zip.dgst"
+        if self.use_cdn:
+            return f"https://download.fastgit.org/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip.dgst"
+        else:
+            return f"https://github.com/{consts.XRAY_GITHUB_USER}/{consts.XRAY_GITHUB_REPO}/releases/download/{{tag}}/Xray-{self.platform}-{self.arch}.zip.dgst"
 
 
 def _prepare_install(xray_f: XrayFile) -> bool:
@@ -168,11 +176,12 @@ async def _unzip_xray_core(xray_f: XrayFile) -> bool:
         return False
 
 
-async def install_xray(install_path: Path = None, force_update: bool = False) -> bool:
+async def install_xray(install_path: Path = None, force_update: bool = False, use_cdn: bool = False) -> bool:
     """
     安装xray-core
     :param install_path: 指定安装目录
     :param force_update: 是否强制升级，默认为否
+    :param use_cdn: 是否使用CDN加速下载
     :return:
     """
     if install_path is None:
@@ -180,7 +189,7 @@ async def install_xray(install_path: Path = None, force_update: bool = False) ->
     else:
         path = install_path
 
-    xray_file = XrayFile(install_path=path)
+    xray_file = XrayFile(install_path=path, use_cdn=use_cdn)
 
     if not _prepare_install(xray_f=xray_file):
         return False

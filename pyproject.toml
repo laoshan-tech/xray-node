@@ -4,6 +4,9 @@ version = "0.0.1"
 description = ""
 authors = ["laoshan-taoist <65347330+laoshan-taoist@users.noreply.github.com>"]
 license = "AGPLv3"
+packages = [
+    { include = "xray_node" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -18,6 +21,13 @@ pytest-asyncio = "^0.14.0"
 name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple"
 default = true
+
+[tool.poetry.scripts]
+xnode = "xray_node.main:main"
+
+[tool.black]
+line-length = 120
+target-version = ["py38"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
