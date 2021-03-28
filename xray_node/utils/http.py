@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
 
-from httpx import AsyncClient
+import httpx
 
-client = AsyncClient()
+client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=10, connect=15))
 logger = logging.getLogger(__name__)
 
 
