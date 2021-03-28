@@ -2,6 +2,10 @@
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/laoshan-tech/xray-node/Lint?style=flat-square)
 ![GitHub](https://img.shields.io/github/license/laoshan-tech/xray-node?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/laoshan-tech/xray-node?style=flat-square)
+![PyPI](https://img.shields.io/pypi/v/xray-node?color=blue&style=flat-square)
+![Slack](https://img.shields.io/badge/news-telegram-26A5E4?style=flat-square&logo=telegram&link=https://t.me/laoshan_tech)
+![Slack](https://img.shields.io/badge/chat-telegram-26A5E4?style=flat-square&logo=telegram&link=https://t.me/laoshan_tech_discuss)
 
 ## 简介
 
