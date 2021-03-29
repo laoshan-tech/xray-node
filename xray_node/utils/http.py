@@ -16,14 +16,13 @@ async def download(url: str, target: Path) -> bool:
     """
     with open(target, "wb") as f:
         try:
-            async with client:
-                async with client.stream(method="GET", url=url) as resp:
-                    logger.info(f"下载 {url} 开始......")
-                    async for chunk in resp.aiter_bytes():
-                        f.write(chunk)
+            async with client.stream(method="GET", url=url) as resp:
+                logger.info(f"下载 {url} 开始......")
+                async for chunk in resp.aiter_bytes():
+                    f.write(chunk)
 
-                logger.info(f"从 {url} 下载文件到 {target} 成功")
-                return True
+            logger.info(f"从 {url} 下载文件到 {target} 成功")
+            return True
         except Exception as e:
             logger.error(f"从 {url} 下载文件到 {target} 失败，{e}")
             return False

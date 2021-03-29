@@ -8,7 +8,7 @@ from xray_node.utils import http
 class TestHttp(object):
     @pytest.mark.asyncio
     async def test_download(self):
-        url = "http://cachefly.cachefly.net/100mb.test"
-        target = Path(__file__).parent / "xray_node_download_test.bin"
+        url = "https://cdn.jsdelivr.net/gh/jquery/jquery/dist/jquery.min.js"
+        target = Path(__file__).parent / "download.test"
         assert await http.download(url=url, target=target) is True
         target.unlink()
