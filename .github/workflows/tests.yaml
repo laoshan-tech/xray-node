@@ -1,0 +1,16 @@
+name: UnitTest
+
+on: [ push, pull_request ]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install dependencies
+        run: pip install poetry && poetry install
+      - name: pytest
+        run: pytest .
