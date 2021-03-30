@@ -27,6 +27,18 @@ class XrayFile(object):
         self.arch = 64 if platform.machine().endswith("64") else 32
 
     @property
+    def xray_conf_dir(self) -> Path:
+        """
+        xray-core配置目录
+        :return:
+        """
+        path = self.xray_install_path / "conf"
+        if not path.exists():
+            path.mkdir(mode=0o755)
+
+        return path
+
+    @property
     def xray_install_path(self) -> Path:
         """
         xray-core安装目录
