@@ -5,6 +5,7 @@ import pytest
 from xray_node.utils import http
 
 
+@pytest.mark.run(order=0)
 class TestHttp(object):
     @pytest.mark.asyncio
     async def test_download(self):

@@ -3,6 +3,7 @@ import pytest
 from xray_node.utils import install
 
 
+@pytest.mark.run(order=1)
 class TestInstall(object):
     xray_file = install.XrayFile()
 
