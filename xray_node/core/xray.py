@@ -3,18 +3,63 @@ import json
 import logging
 from typing import Union
 
+import grpc
 import psutil
-
+from google.protobuf import message as _message
+from xray_node.config import Config
 from xray_node.core import cfg
 from xray_node.utils.install import XrayFile
+from xray_rpc.app.stats.command import command_pb2 as stats_command_pb2
+from xray_rpc.app.stats.command import command_pb2_grpc as stats_command_pb2_grpc
+from xray_rpc.common.serial import typed_message_pb2
 
 logger = logging.getLogger(__name__)
+cfg_cls = Config()
+
+
+def to_typed_message(message: _message):
+    return typed_message_pb2.TypedMessage(type=message.DESCRIPTOR.full_name, value=message.SerializeToString())
+
+
+def ip2bytes(ip: str):
+    return bytes([int(i) for i in ip.split(".")])
 
 
 class Xray(object):
     def __init__(self, xray_f: XrayFile):
         self.xray_f = xray_f
         self.xray_proc: Union[None, psutil.Process] = None
+        self.xray_client = grpc.insecure_channel(target=f"{cfg_cls.local_api_host}:{cfg_cls.local_api_port}")
+
+    async def get_user_upload_traffic(self, email: str, reset: bool = False) -> Union[int, None]:
+        """
+        获取用户上行流量，单位字节
+        :param email: 邮箱，用于标识用户
+        :param reset: 是否重置流量统计
+        :return:
+        """
+        stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
+        try:
+            return stub.GetStats(
+                stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>uplink", reset=reset)
+            ).stat.value
+        except grpc.RpcError:
+            return None
+
+    async def get_user_download_traffic(self, email: str, reset: bool = False):
+        """
+        获取用户下行流量，单位字节
+        :param email: 邮箱，用于标识用户
+        :param reset: 是否重置流量统计
+        :return:
+        """
+        stub = stats_command_pb2_grpc.StatsServiceStub(self._channel)
+        try:
+            return stub.GetStats(
+                stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>downlink", reset=reset)
+            ).stat.value
+        except grpc.RpcError:
+            return None
 
     async def gen_cfg(self) -> None:
         """

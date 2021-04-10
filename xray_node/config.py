@@ -4,7 +4,7 @@ from pathlib import Path
 import tomlkit
 
 
-async def init_config(target: Path):
+def init_config(target: Path):
     """
     初始化配置文件
     :param target:
@@ -41,16 +41,16 @@ class Config(object):
         else:
             fn = Path("./xnode.yaml")
 
-        if fn.exists():
-            with open(fn, "r") as f:
-                self.content = tomlkit.parse(f.read())
-        else:
-            raise FileNotFoundError(f"{fn} does not exists")
+        if not fn.exists():
+            init_config(target=fn)
+
+        with open(fn, "r") as f:
+            self.content = tomlkit.parse(f.read())
 
         self.local_api_host = self.content["xray"]["api"]["host"]
         self.local_api_port = self.content["xray"]["api"]["port"]
 
-    def __new__(cls, cfg, *args, **kwargs):
+    def __new__(cls, cfg: Path = None, *args, **kwargs):
         if not hasattr(Config, "_instance"):
             with Config._instance_lock:
                 if not hasattr(Config, "_instance"):

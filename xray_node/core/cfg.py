@@ -1,3 +1,7 @@
+from xray_node.config import Config
+
+cfg_cls = Config()
+
 BASE_CFG = {"log": {}, "api": {}, "dns": {}, "stats": {}, "policy": {}, "transport": {}, "routing": {}, "inbounds": []}
 
 API_CFG = {"api": {"tag": "api", "services": ["HandlerService", "LoggerService", "StatsService"]}}
@@ -29,10 +33,10 @@ ROUTING_CFG = {
 INBOUNDS_CFG = {
     "inbounds": [
         {
-            "listen": "127.0.0.1",
-            "port": 10085,
+            "listen": cfg_cls.local_api_host,
+            "port": cfg_cls.local_api_port,
             "protocol": "dokodemo-door",
-            "settings": {"address": "127.0.0.1"},
+            "settings": {"address": cfg_cls.local_api_host},
             "tag": "api",
         },
     ]
