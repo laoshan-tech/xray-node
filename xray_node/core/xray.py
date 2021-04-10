@@ -6,12 +6,13 @@ from typing import Union
 import grpc
 import psutil
 from google.protobuf import message as _message
-from xray_node.config import Config
-from xray_node.core import cfg
-from xray_node.utils.install import XrayFile
 from xray_rpc.app.stats.command import command_pb2 as stats_command_pb2
 from xray_rpc.app.stats.command import command_pb2_grpc as stats_command_pb2_grpc
 from xray_rpc.common.serial import typed_message_pb2
+
+from xray_node.config import Config
+from xray_node.core import cfg
+from xray_node.utils.install import XrayFile
 
 logger = logging.getLogger(__name__)
 cfg_cls = Config()
@@ -53,7 +54,7 @@ class Xray(object):
         :param reset: 是否重置流量统计
         :return:
         """
-        stub = stats_command_pb2_grpc.StatsServiceStub(self._channel)
+        stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
         try:
             return stub.GetStats(
                 stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>downlink", reset=reset)
