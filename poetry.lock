@@ -110,6 +110,25 @@ url = "https://pypi.doubanio.com/simple"
 reference = "douban"
 
 [[package]]
+name = "googleapis-common-protos"
+version = "1.53.0"
+description = "Common protobufs used in Google APIs"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+protobuf = ">=3.12.0"
+
+[package.extras]
+grpc = ["grpcio (>=1.0.0)"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.doubanio.com/simple"
+reference = "douban"
+
+[[package]]
 name = "grpcio"
 version = "1.37.0"
 description = "HTTP/2-based RPC framework"
@@ -122,6 +141,24 @@ six = ">=1.5.2"
 
 [package.extras]
 protobuf = ["grpcio-tools (>=1.37.0)"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.doubanio.com/simple"
+reference = "douban"
+
+[[package]]
+name = "grpcio-status"
+version = "1.37.0"
+description = "Status proto mapping for gRPC"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+googleapis-common-protos = ">=1.5.5"
+grpcio = ">=1.37.0"
+protobuf = ">=3.6.0"
 
 [package.source]
 type = "legacy"
@@ -553,7 +590,7 @@ reference = "douban"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "43382f6244a4550ed8603103b3065898ff2766f50cac70c6a1b3492a3d08a2de"
+content-hash = "79bacaa932d76510f2f8cbc988f12bd246b521dec288b46b5d08d09e646a2eda"
 
 [metadata.files]
 appdirs = [
@@ -582,6 +619,10 @@ click = [
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
     {file = "colorama-0.4.4.tar.gz", hash = "sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b"},
+]
+googleapis-common-protos = [
+    {file = "googleapis-common-protos-1.53.0.tar.gz", hash = "sha256:a88ee8903aa0a81f6c3cec2d5cf62d3c8aa67c06439b0496b49048fb1854ebf4"},
+    {file = "googleapis_common_protos-1.53.0-py2.py3-none-any.whl", hash = "sha256:f6d561ab8fb16b30020b940e2dd01cd80082f4762fa9f3ee670f4419b4b8dbd0"},
 ]
 grpcio = [
     {file = "grpcio-1.37.0-cp27-cp27m-macosx_10_10_x86_64.whl", hash = "sha256:8a0517e7a6784439a3730e50597bd64debf776692adea3c18f869a36454952e1"},
@@ -634,6 +675,9 @@ grpcio = [
     {file = "grpcio-1.37.0-cp39-cp39-win32.whl", hash = "sha256:adfef1a3994220bd39e5e2dd57714ca94c4c38c9015f2812a0b09b39f86ddbe0"},
     {file = "grpcio-1.37.0-cp39-cp39-win_amd64.whl", hash = "sha256:df142d51d7de3f8d13aaa78f7ddc7d74088226f92ec5aae8d98d8ae5d328f74b"},
     {file = "grpcio-1.37.0.tar.gz", hash = "sha256:b3ce16aa91569760fdabd77ca901b2288152eb16941d28edd9a3a75a0c4a8a85"},
+]
+grpcio-status = [
+    {file = "grpcio-status-1.37.0.tar.gz", hash = "sha256:edfa45fb1b82eea8d816bd28fb886ae5b86d57a947a6adc83540238324fa2820"},
 ]
 grpcio-tools = [
     {file = "grpcio-tools-1.37.0.tar.gz", hash = "sha256:3ec510c1b6bfc32effc639acf9a055e72dab7a7b6757bf72f2132790d6a7cf1c"},
