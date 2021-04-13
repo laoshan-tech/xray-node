@@ -19,7 +19,7 @@ psutil = "^5.8.0"
 tomlkit = "^0.7.0"
 grpcio = "^1.37.0"
 grpcio-tools = "^1.37.0"
-xray-rpc = "^1.4.2.202104090236"
+xray-rpc = "^1.4.2"
 uvloop = [
     { version = "^0.15.2", platform = "linux|macos" },
 ]
@@ -31,8 +31,8 @@ pytest-asyncio = "^0.14.0"
 pytest-ordering = "^0.6"
 
 [[tool.poetry.source]]
-name = "douban"
-url = "https://pypi.doubanio.com/simple"
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
 
 [tool.poetry.scripts]

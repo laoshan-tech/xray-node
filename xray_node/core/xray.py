@@ -20,11 +20,14 @@ from xray_rpc.core import config_pb2 as core_config_pb2
 from xray_rpc.proxy.shadowsocks import config_pb2 as shadowsocks_config_pb2
 from xray_rpc.proxy.trojan import config_pb2 as trojan_config_pb2
 from xray_rpc.proxy.vless import account_pb2 as vless_account_pb2
+from xray_rpc.proxy.vless.inbound import config_pb2 as vless_inbound_config_pb2
 from xray_rpc.proxy.vmess import account_pb2 as vmess_account_pb2
+from xray_rpc.proxy.vmess.inbound import config_pb2 as vmess_inbound_config_pb2
 
 from xray_node.config import Config
 from xray_node.core import cfg
 from xray_node.exceptions import EmailExistsError, InboundTagNotFound, XrayError, AddressAlreadyInUseError
+from xray_node.utils.consts import NETWORK_DICT
 from xray_node.utils.install import XrayFile
 
 logger = logging.getLogger(__name__)
@@ -37,6 +40,109 @@ def to_typed_message(message: _message):
 
 def ip2bytes(ip: str):
     return bytes([int(i) for i in ip.split(".")])
+
+
+class Protocol(object):
+    def __init__(self):
+        self.message = None
+
+
+class VMessInbound(Protocol):
+    def __init__(self, email: str, level: int, alter_id: int, user_id: str):
+        """
+        VMess
+        :param email: 邮箱
+        :param level: 等级
+        :param alter_id:
+        :param user_id: UUID
+        """
+        super(VMessInbound, self).__init__()
+        self.message = to_typed_message(
+            vmess_inbound_config_pb2.Config(
+                user=[
+                    user_pb2.User(
+                        email=email,
+                        level=level,
+                        account=to_typed_message(vmess_account_pb2.Account(id=user_id, alter_id=alter_id)),
+                    )
+                ]
+            )
+        )
+
+
+class VLESSInbound(Protocol):
+    def __init__(self, email: str, level: int, flow: int, user_id: str):
+        """
+        VLESS
+        :param email: 邮箱
+        :param level: 等级
+        :param flow: flow 如 xtls-rprx-direct
+        :param user_id: UUID
+        """
+        super(VLESSInbound, self).__init__()
+        self.message = to_typed_message(
+            vless_inbound_config_pb2.Config(
+                clients=[
+                    user_pb2.User(
+                        email=email,
+                        level=level,
+                        account=to_typed_message(vless_account_pb2.Account(id=user_id, flow=flow)),
+                    )
+                ],
+                decryption="",
+                fallbacks=[],
+            )
+        )
+
+
+class ShadowsocksInbound(Protocol):
+    def __init__(self, email: str, level: int, password: str, cipher_type: int):
+        """
+        Shadowsocks
+        :param email: 邮箱
+        :param level: 等级
+        :param password: 密码
+        :param cipher_type: 加密方式
+        """
+        super(ShadowsocksInbound, self).__init__()
+        self.message = to_typed_message(
+            shadowsocks_config_pb2.ServerConfig(
+                users=[
+                    user_pb2.User(
+                        email=email,
+                        level=level,
+                        account=to_typed_message(
+                            shadowsocks_config_pb2.Account(password=password, cipher_type=cipher_type)
+                        ),
+                    )
+                ],
+                network=[NETWORK_DICT["tcp"], NETWORK_DICT["udp"]],
+            )
+        )
+
+
+class TrojanInbound(Protocol):
+    def __init__(self, email: str, level: int, password: str, flow: str):
+        """
+        Trojan
+        :param email: 邮箱
+        :param level: 等级
+        :param password: 密码
+        :param flow: 流控
+        """
+        super(TrojanInbound, self).__init__()
+        self.message = to_typed_message(
+            trojan_config_pb2.ServerConfig(
+                users=[
+                    user_pb2.User(
+                        email=email,
+                        level=level,
+                        account=to_typed_message(trojan_config_pb2.Account(password=password, flow=flow)),
+                    )
+                ],
+                fallbacks=[],
+            )
+        )
 
 
 class Xray(object):
@@ -54,9 +160,10 @@ class Xray(object):
         """
         stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
         try:
-            return stub.GetStats(
+            resp = stub.GetStats(
                 stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>uplink", reset=reset)
-            ).stat.value
+            )
+            return resp.stat.value
         except grpc.RpcError:
             return None
 
@@ -69,9 +176,40 @@ class Xray(object):
         """
         stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
         try:
-            return stub.GetStats(
+            resp = stub.GetStats(
                 stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>downlink", reset=reset)
-            ).stat.value
+            )
+            return resp.stat.value
+        except grpc.RpcError:
+            return None
+
+    async def get_inbound_upload_traffic(self, inbound_tag: str, reset: bool = False) -> Union[int, None]:
+        """
+        获取特定传入连接上行流量，单位字节
+        :param inbound_tag:
+        :return:
+        """
+        stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
+        try:
+            resp = stub.GetStats(
+                stats_command_pb2.GetStatsRequest(name=f"inbound>>>{inbound_tag}>>>traffic>>>uplink", reset=reset)
+            )
+            return resp.stat.value
+        except grpc.RpcError:
+            return None
+
+    async def get_inbound_download_traffic(self, inbound_tag: str, reset: bool = False) -> Union[int, None]:
+        """
+        获取特定传入连接下行流量，单位字节
+        :param inbound_tag:
+        :return:
+        """
+        stub = stats_command_pb2_grpc.StatsServiceStub(self.xray_client)
+        try:
+            resp = stub.GetStats(
+                stats_command_pb2.GetStatsRequest(name=f"inbound>>>{inbound_tag}>>>traffic>>>downlink", reset=reset)
+            )
+            return resp.stat.value
         except grpc.RpcError:
             return None
 
@@ -117,14 +255,13 @@ class Xray(object):
             )
             return user_id
         except grpc.RpcError as rpc_err:
-            status = rpc_status.from_call(rpc_err)
-            for detail in status.details:
-                if detail.endswith(f"User {email} already exists."):
-                    raise EmailExistsError(detail, email)
-                elif detail.endswith(f"handler not found: {inbound_tag}"):
-                    raise InboundTagNotFound(detail, inbound_tag)
-                else:
-                    raise XrayError(detail)
+            detail = rpc_err.details()
+            if detail.endswith(f"User {email} already exists."):
+                raise EmailExistsError(detail, email)
+            elif detail.endswith(f"handler not found: {inbound_tag}"):
+                raise InboundTagNotFound(detail, inbound_tag)
+            else:
+                raise XrayError(detail)
 
     async def remove_user(self, inbound_tag: str, email: str):
         """
@@ -141,26 +278,26 @@ class Xray(object):
                 )
             )
         except grpc.RpcError as rpc_err:
-            status = rpc_status.from_call(rpc_err)
-            for detail in status.details:
-                if detail.endswith(f"User {email} already exists."):
-                    raise EmailExistsError(detail, email)
-                elif detail.endswith(f"handler not found: {inbound_tag}"):
-                    raise InboundTagNotFound(detail, inbound_tag)
-                else:
-                    raise XrayError(detail)
+            detail = rpc_err.details()
+            if detail.endswith(f"User {email} already exists."):
+                raise EmailExistsError(detail, email)
+            elif detail.endswith(f"handler not found: {inbound_tag}"):
+                raise InboundTagNotFound(detail, inbound_tag)
+            else:
+                raise XrayError(detail)
 
-    async def add_inbound(self, inbound_tag: str, address: str, port: int, proxy):
+    async def add_inbound(self, inbound_tag: str, address: str, port: int, protocol: Protocol) -> None:
         """
         增加传入连接
         :param inbound_tag: 传入连接的标识
         :param address: 监听地址
         :param port: 监听端口
-        :param proxy: 代理配置
+        :param protocol: 代理配置
         """
         stub = proxyman_command_pb2_grpc.HandlerServiceStub(self.xray_client)
         try:
-            stub.AddInbound(
+            logger.error(stub)
+            resp = stub.AddInbound(
                 proxyman_command_pb2.AddInboundRequest(
                     inbound=core_config_pb2.InboundHandlerConfig(
                         tag=inbound_tag,
@@ -180,17 +317,17 @@ class Xray(object):
                                 sniffing_settings=None,
                             )
                         ),
-                        proxy_settings=proxy.message,
+                        proxy_settings=protocol.message,
                     )
                 )
             )
+            logger.error(resp)
         except grpc.RpcError as rpc_err:
-            status = rpc_status.from_call(rpc_err)
-            for detail in status.details:
-                if detail.endswith("address already in use"):
-                    raise AddressAlreadyInUseError(detail, port)
-                else:
-                    raise XrayError(detail)
+            detail = rpc_err.details()
+            if detail.endswith("address already in use"):
+                raise AddressAlreadyInUseError(detail, port)
+            else:
+                raise XrayError(detail)
 
     async def remove_inbound(self, inbound_tag: str):
         """
@@ -202,12 +339,11 @@ class Xray(object):
         try:
             stub.RemoveInbound(proxyman_command_pb2.RemoveInboundRequest(tag=inbound_tag))
         except grpc.RpcError as rpc_err:
-            status = rpc_status.from_call(rpc_err)
-            for detail in status.details:
-                if detail == "not enough information for making a decision":
-                    raise InboundTagNotFound(detail, inbound_tag)
-                else:
-                    raise XrayError(detail)
+            detail = rpc_err.details()
+            if detail == "not enough information for making a decision":
+                raise InboundTagNotFound(detail, inbound_tag)
+            else:
+                raise XrayError(detail)
 
     async def gen_cfg(self) -> None:
         """
