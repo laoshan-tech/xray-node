@@ -1,43 +1,32 @@
 import asyncio
 import logging
-import os
 import platform
+from pathlib import Path
 
 import click
 
+from xray_node.config import Config
 from xray_node.core.xray import Xray
+from xray_node.utils.http import client
+from xray_node.utils.install import XrayFile, install_xray
 
 logger = logging.getLogger(__name__)
 
 
 class XrayNode(object):
-    def __init__(self):
+    def __init__(self, install_path: Path = None, force_update: bool = False, use_cdn: bool = False):
         self.__prepared = False
+        self.install_path = install_path
+        self.force_update = force_update
+        self.use_cdn = use_cdn
+        self.xray_f = XrayFile(install_path=self.install_path)
 
     def __init_config(self) -> None:
-        self.config = {
-            "LISTEN_HOST": os.getenv("SS_LISTEN_HOST", "0.0.0.0"),
-            "SENTRY_DSN": os.getenv("SS_SENTRY_DSN"),
-            "API_ENDPOINT": os.getenv("SS_API_ENDPOINT"),
-            "LOG_LEVEL": os.getenv("SS_LOG_LEVEL", "INFO"),
-            "SYNC_TIME": int(os.getenv("SS_SYNC_TIME", 60)),
-            "STREAM_DNS_SERVER": os.getenv("SS_STREAM_DNS_SERVER"),
-            "TIME_OUT_LIMIT": int(os.getenv("SS_TIME_OUT_LIMIT", 60)),
-            "USER_TCP_CONN_LIMIT": int(os.getenv("SS_TCP_CONN_LIMIT", 60)),
-            "PANEL_TYPE": os.getenv("PANEL_TYPE", None),
-        }
-        self.log_level = self.config["LOG_LEVEL"]
-        self.sync_time = self.config["SYNC_TIME"]
-        self.sentry_dsn = self.config["SENTRY_DSN"]
-        self.listen_host = self.config["LISTEN_HOST"]
-        self.api_endpoint = self.config["API_ENDPOINT"]
-        self.panel_type = self.config["PANEL_TYPE"]
-        self.timeout_limit = self.config["TIME_OUT_LIMIT"]
-        self.stream_dns_server = self.config["STREAM_DNS_SERVER"]
-        self.user_tcp_conn_limit = self.config["USER_TCP_CONN_LIMIT"]
-
-        self.use_sentry = True if self.sentry_dsn else False
-        self.use_json = False if self.api_endpoint or self.panel_type else True
+        """
+        读入配置文件
+        :return:
+        """
+        self.config = Config(cfg=self.xray_f.xn_cfg_fn)
 
     def __prepare_logger(self) -> None:
         """
@@ -51,7 +40,7 @@ class XrayNode(object):
             "INFO": logging.INFO,
             "DEBUG": logging.DEBUG,
         }
-        level = log_levels[self.log_level.upper()]
+        level = log_levels[self.config.log_level.upper()]
         logging.basicConfig(
             format="%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)s - %(message)s",
             level=level,
@@ -81,13 +70,22 @@ class XrayNode(object):
         if self.__prepared:
             return
 
+        self.__init_loop()
         self.__init_config()
         self.__prepare_logger()
-        self.__init_loop()
 
-        self.xray = Xray()
+        self.xray = Xray(xray_f=self.xray_f)
 
         self.__prepared = True
+
+    async def __cleanup(self) -> None:
+        """
+
+        :return:
+        """
+        await self.xray.stop()
+        if not client.is_closed:
+            await client.aclose()
 
     def __shutdown(self) -> None:
         """
@@ -95,7 +93,7 @@ class XrayNode(object):
         :return:
         """
         logger.info("正在关闭 Xray 服务")
-        self.loop.run_until_complete(self.xray.stop())
+        self.loop.run_until_complete(self.__cleanup())
         if self.loop.is_running():
             self.loop.stop()
 
@@ -109,22 +107,69 @@ class XrayNode(object):
         except KeyboardInterrupt:
             self.__shutdown()
 
+    async def __sync_user_from_local(self):
+        """
+        本地模式同步用户
+        :return:
+        """
+        pass
+
+    async def __sync_user_from_remote(self):
+        """
+        远程模式同步用户
+        :return:
+        """
+        pass
+
+    async def __user_man_cron(self):
+        """
+        用户管理
+        :return:
+        """
+        if self.config.user_mode == "local":
+            logger.info(f"使用本地配置文件 {self.config} 加载用户信息")
+            await self.__sync_user_from_local()
+        elif self.config.user_mode == "remote":
+            logger.info(f"使用远程服务加载用户信息")
+            await self.__sync_user_from_remote()
+
+        self.loop.call_later(60, self.loop.create_task, self.__user_man_cron())
+
+    async def __run_xray(self):
+        """
+        xray-core服务启动与用户管理
+        :return:
+        """
+        await install_xray(install_path=self.install_path, force_update=self.force_update, use_cdn=self.use_cdn)
+        await self.xray.start()
+        await self.__user_man_cron()
+
     def start(self) -> None:
         """
         启动服务
         :return:
         """
         self.__prepare()
-        self.loop.create_task(self.xray.start())
+        self.loop.create_task(self.__run_xray())
         self.__run_loop()
 
 
 @click.command()
-def main():
+@click.option(
+    "-p",
+    "--path",
+    default=Path().home() / "xray-node",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="xray-core installation path.",
+)
+@click.option("--force-update", default=False, is_flag=True, help="Force update xray-core.")
+@click.option("--use-cdn", default=False, is_flag=True, help="Install xray-core from CDN.")
+def main(path: Path, force_update: bool, use_cdn: bool):
     """
-    xray_node is a nice tool to manage ss/vmess/vless proxy nodes based on xray-core.
+    xray-node is a nice management tool for ss/vmess/vless/trojan proxy nodes based on xray-core.
     """
-    pass
+    xn = XrayNode(install_path=Path(path), force_update=force_update, use_cdn=use_cdn)
+    xn.start()
 
 
 if __name__ == "__main__":

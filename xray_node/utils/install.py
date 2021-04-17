@@ -39,6 +39,14 @@ class XrayFile(object):
         return path
 
     @property
+    def xn_cfg_fn(self) -> Path:
+        """
+        xray-node配置路径
+        :return:
+        """
+        return self.path / "xnode.yaml"
+
+    @property
     def xray_install_path(self) -> Path:
         """
         xray-core安装目录

@@ -14,5 +14,6 @@ class TestConfig(object):
 
     def test_config_cls(self):
         cfg = Config()
+        assert len(cfg.clients) > 0
         assert cfg.local_api_host == "127.0.0.1"
         assert cfg.local_api_port == 10085

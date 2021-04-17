@@ -10,25 +10,41 @@ def init_config(target: Path):
     :param target:
     :return:
     """
-    doc = tomlkit.document()
-    doc.add(tomlkit.comment("xray-node 配置文件"))
+    template = """# xray-node 配置文件
 
-    user = tomlkit.table()
-    user.add("mode", "local")
-    user["mode"].comment("用户管理模式，local 通过本地文件管理，remote 通过面板管理")
-    doc.add("user", user)
-    doc.add(tomlkit.nl())
+[log]
+level = "info" # 日志等级，debug/info/warning/error
 
-    xray = tomlkit.table()
-    xray._is_super_table = True
-    api = tomlkit.table()
-    api.add("host", "127.0.0.1")
-    api.add("port", 10085)
-    xray["api"] = api
-    doc["xray"] = xray
+[user]
+mode = "local" # 用户管理模式，local 通过本地文件管理，remote 通过面板管理
+
+[[user.clients]]
+type = "shadowsocks"
+password = "aabbccdd"
+cipher_type = "aes-256-gcm"
+
+[[user.clients]]
+type = "shadowsocks"
+password = "aabbccdd"
+cipher_type = "aes-256-gcm"
+
+[[user.clients]]
+type = "shadowsocks"
+password = "aabbccdd"
+cipher_type = "aes-256-gcm"
+
+[xray.api]
+host = "127.0.0.1"
+port = 10085
+
+[[xray.inbounds]]
+listen = "0.0.0.0"
+port = 1234
+protocol = "shadowsocks"
+"""
 
     with open(target, "w") as f:
-        f.write(tomlkit.dumps(doc))
+        f.write(template)
 
 
 class Config(object):
@@ -46,6 +62,13 @@ class Config(object):
 
         with open(fn, "r") as f:
             self.content = tomlkit.parse(f.read())
+
+        self.log_level = self.content["log"]["level"]
+
+        self.user_mode = self.content["user"]["mode"]
+
+        self.clients = self.content["user"]["clients"]
+        self.inbounds = self.content["xray"]["inbounds"]
 
         self.local_api_host = self.content["xray"]["api"]["host"]
         self.local_api_port = self.content["xray"]["api"]["port"]
