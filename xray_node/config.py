@@ -42,7 +42,7 @@ listen = "0.0.0.0"
 port = 1234
 protocol = "shadowsocks"
 """
-
+    target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     with open(target, "w") as f:
         f.write(template)
 
@@ -53,14 +53,14 @@ class Config(object):
     def __init__(self, cfg: Path = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if cfg:
-            fn = cfg
+            self.fn = cfg
         else:
-            fn = Path("./xnode.yaml")
+            self.fn = Path("./xnode.yaml")
 
-        if not fn.exists():
-            init_config(target=fn)
+        if not self.fn.exists():
+            init_config(target=self.fn)
 
-        with open(fn, "r") as f:
+        with open(self.fn, "r") as f:
             self.content = tomlkit.parse(f.read())
 
         self.log_level = self.content["log"]["level"]

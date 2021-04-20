@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import platform
 from pathlib import Path
 
 import click
@@ -8,7 +7,7 @@ import click
 from xray_node.config import Config
 from xray_node.core.xray import Xray
 from xray_node.utils.http import client
-from xray_node.utils.install import XrayFile, install_xray
+from xray_node.utils.install import XrayFile, install_xray, is_xray_installed
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +50,12 @@ class XrayNode(object):
         初始化事件循环
         :return:
         """
-        is_win = platform.system().lower() == "windows"
-        if not is_win:
+        try:
             import uvloop
 
             logger.info("使用 uvloop 加速")
             uvloop.install()
-        else:
+        except ImportError:
             logger.info("使用原生 asyncio")
 
         self.loop = asyncio.get_event_loop()
@@ -127,7 +125,7 @@ class XrayNode(object):
         :return:
         """
         if self.config.user_mode == "local":
-            logger.info(f"使用本地配置文件 {self.config} 加载用户信息")
+            logger.info(f"使用本地配置文件 {self.config.fn} 加载用户信息")
             await self.__sync_user_from_local()
         elif self.config.user_mode == "remote":
             logger.info(f"使用远程服务加载用户信息")
@@ -140,9 +138,25 @@ class XrayNode(object):
         xray-core服务启动与用户管理
         :return:
         """
-        await install_xray(install_path=self.install_path, force_update=self.force_update, use_cdn=self.use_cdn)
+        if not is_xray_installed(xray_f=self.xray_f):
+            logger.error(f"xray-core 未成功安装在 {self.xray_f.xray_install_path} 下，退出")
+            if self.loop.is_running():
+                self.loop.stop()
+
+            return
+
         await self.xray.start()
         await self.__user_man_cron()
+
+    def install(self) -> None:
+        """
+        安装xray-core
+        :return:
+        """
+        self.__prepare()
+        self.loop.run_until_complete(
+            install_xray(install_path=self.install_path, force_update=self.force_update, use_cdn=self.use_cdn)
+        )
 
     def start(self) -> None:
         """
@@ -154,7 +168,31 @@ class XrayNode(object):
         self.__run_loop()
 
 
-@click.command()
+@click.group()
+def cli():
+    """
+    xray-node is a nice management tool for ss/vmess/vless/trojan proxy nodes based on xray-core.
+    """
+    pass
+
+
+@cli.command()
+@click.option(
+    "-p",
+    "--path",
+    default=Path().home() / "xray-node",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="xray-core installation path.",
+)
+def run(path):
+    """
+    Run xray-core.
+    """
+    xn = XrayNode(install_path=Path(path))
+    xn.start()
+
+
+@cli.command()
 @click.option(
     "-p",
     "--path",
@@ -164,13 +202,13 @@ class XrayNode(object):
 )
 @click.option("--force-update", default=False, is_flag=True, help="Force update xray-core.")
 @click.option("--use-cdn", default=False, is_flag=True, help="Install xray-core from CDN.")
-def main(path: Path, force_update: bool, use_cdn: bool):
+def install(path, force_update: bool, use_cdn: bool):
     """
-    xray-node is a nice management tool for ss/vmess/vless/trojan proxy nodes based on xray-core.
+    Install xray-core.
     """
     xn = XrayNode(install_path=Path(path), force_update=force_update, use_cdn=use_cdn)
-    xn.start()
+    xn.install()
 
 
 if __name__ == "__main__":
-    main()
+    cli()

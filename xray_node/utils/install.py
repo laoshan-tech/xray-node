@@ -112,7 +112,7 @@ def _prepare_install(xray_f: XrayFile) -> bool:
         return False
 
 
-def _is_installed(xray_f: XrayFile) -> bool:
+def is_xray_installed(xray_f: XrayFile) -> bool:
     """
     检查是否已安装
     :param xray_f:
@@ -233,12 +233,12 @@ async def install_xray(install_path: Path = None, force_update: bool = False, us
     if not _prepare_install(xray_f=xray_file):
         return False
 
-    if force_update is False and _is_installed(xray_f=xray_file):
+    if force_update is False and is_xray_installed(xray_f=xray_file):
         logger.info(f"xray-core 已经安装在 {path} 目录下")
         return True
 
     if await _download_xray_zip(xray_f=xray_file) and await _unzip_xray_core(xray_f=xray_file):
-        if _is_installed(xray_f=xray_file):
+        if is_xray_installed(xray_f=xray_file):
             logger.info(f"成功安装 xray-core 至 {xray_file.xray_install_path}")
             return True
         else:

@@ -6,7 +6,6 @@ from typing import Union
 import grpc
 import psutil
 from google.protobuf import message as _message
-from grpc_status import rpc_status
 from xray_rpc.app.proxyman import config_pb2 as proxyman_config_pb2
 from xray_rpc.app.proxyman.command import (
     command_pb2_grpc as proxyman_command_pb2_grpc,
