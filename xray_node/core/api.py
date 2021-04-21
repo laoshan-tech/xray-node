@@ -1,6 +1,8 @@
 import logging
+from typing import List
 from urllib.parse import urljoin
 
+from xray_node.core.entities import SSPanelUser, SSPanelNode
 from xray_node.exceptions import FetchNodeInfoError
 from xray_node.utils import http
 
@@ -64,21 +66,42 @@ class SSPanelAPI(BaseAPI):
 
     def __prepare_api(self) -> None:
         self.fetch_node_info_api = urljoin(base=self.endpoint, url=f"/mod_mu/nodes/{self.node_id}/info")
-        self.fetch_user_list_api = self.endpoint
+        self.fetch_user_list_api = urljoin(base=self.endpoint, url=f"/mod_mu/users")
         self.report_user_stats_api = self.endpoint
 
-    async def fetch_node_info(self):
+    async def fetch_node_info(self) -> SSPanelNode:
         req = await self.session.get(url=self.fetch_node_info_api, params={"key", self.mu_key})
         result = req.json()
         ret = result["ret"]
         if ret != 0:
             raise FetchNodeInfoError(msg=result["data"])
 
-    async def fetch_user_list(self) -> list:
-        req = await self.session.get(url=self.fetch_user_list_api)
-        user_data = req.json()["users"]
-        logger.info(f"获取用户信息成功，本次获取到 {len(user_data)} 个用户信息")
-        return user_data
+        return
+
+    async def fetch_user_list(self) -> List[SSPanelUser]:
+        req = await self.session.get(url=self.fetch_user_list_api, params={"key": self.mu_key, "node_id": self.node_id})
+        result = req.json()
+        ret = result["ret"]
+        if ret != 0:
+            raise FetchNodeInfoError(msg=result["data"])
+
+        user_data = req.json()["data"]
+        if len(user_data) > 0:
+            logger.info(f"获取用户信息成功，本次获取到 {len(user_data)} 个用户信息")
+            return [self.parse_user(data=u) for u in user_data]
+        else:
+            logger.warning(f"未获取到有效用户")
+            return []
+
+    def parse_user(self, data: dict) -> SSPanelUser:
+        """
+        从API数据解析用户信息
+        :return:
+        """
+        uid = data.get("id", -1)
+        email = data.get("email", f"{uid}")
+        sspanel_user = SSPanelUser(id=uid, email=email, password=data.get("password"))
+        return sspanel_user
 
     async def report_user_stats(self, user_data: list = None) -> None:
         if user_data is None:
