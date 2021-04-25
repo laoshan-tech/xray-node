@@ -27,3 +27,5 @@ CIPHER_TYPE_DICT = {
 }
 
 NETWORK_DICT = {"tcp": network_pb2.TCP, "udp": network_pb2.UDP, "raw-tcp": network_pb2.RawTCP}
+
+SSPANEL_NODE_TYPE = {0: "ss", 10: "", 11: "vmess", 12: "vmess", 14: "trojan"}
