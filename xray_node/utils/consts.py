@@ -1,3 +1,5 @@
+from enum import Enum
+
 from xray_rpc.common.net import network_pb2
 from xray_rpc.proxy.shadowsocks.config_pb2 import (
     NONE,
@@ -10,6 +12,15 @@ from xray_rpc.proxy.shadowsocks.config_pb2 import (
     AES_128_GCM,
     AES_256_GCM,
 )
+
+
+class NodeTypeEnum(Enum):
+    Shadowsocks = "shadowsocks"
+    ShadowsocksR = "shadowsocksr"
+    VMess = "vmess"
+    VLess = "vless"
+    Trojan = "trojan"
+
 
 XRAY_GITHUB_USER = "XTLS"
 XRAY_GITHUB_REPO = "Xray-core"
@@ -28,4 +39,10 @@ CIPHER_TYPE_DICT = {
 
 NETWORK_DICT = {"tcp": network_pb2.TCP, "udp": network_pb2.UDP, "raw-tcp": network_pb2.RawTCP}
 
-SSPANEL_NODE_TYPE = {0: "ss", 10: "", 11: "vmess", 12: "vmess", 14: "trojan"}
+SSPANEL_NODE_TYPE = {
+    0: NodeTypeEnum.Shadowsocks,
+    10: NodeTypeEnum.Shadowsocks,
+    11: NodeTypeEnum.VMess,
+    12: NodeTypeEnum.VMess,
+    14: NodeTypeEnum.Trojan,
+}

@@ -2,10 +2,9 @@ import logging
 from typing import List, Union
 from urllib.parse import urljoin, urlparse
 
-from xray_node.api import BaseAPI
-from xray_node.api.entities import SSNode, GenericNode, GenericUser, VMessNode, VLessNode, TrojanNode
+from xray_node.api import BaseAPI, entities
 from xray_node.exceptions import FetchNodeInfoError
-from xray_node.utils.consts import SSPANEL_NODE_TYPE
+from xray_node.utils.consts import SSPANEL_NODE_TYPE, NodeTypeEnum
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,8 @@ class SSPanelAPI(BaseAPI):
         self.node_id = node_id
 
         self.node = None
+        self.node_type = None
+        self.multi_user = None
         self.__prepare_api()
 
     def __prepare_api(self) -> None:
@@ -28,26 +29,28 @@ class SSPanelAPI(BaseAPI):
         self.fetch_user_list_api = urljoin(base=self.endpoint, url=f"/mod_mu/users")
         self.report_user_stats_api = self.endpoint
 
-    async def fetch_node_info(self) -> GenericNode:
-        req = await self.session.get(url=self.fetch_node_info_api, params={"key", self.mu_key})
+    async def fetch_node_info(self) -> entities.GenericNode:
+        req = await self.session.get(url=self.fetch_node_info_api, params={"key": self.mu_key})
         result = req.json()
         ret = result["ret"]
-        if ret != 0:
+        if ret != 1:
             raise FetchNodeInfoError(msg=result["data"])
 
         node_data = result["data"]
-        _type = SSPANEL_NODE_TYPE.get(int(node_data["sort"]))
+        self.node_type = SSPANEL_NODE_TYPE.get(int(node_data["sort"]))
 
-        if _type == "ss":
+        if self.node_type == NodeTypeEnum.Shadowsocks:
             self.node = self.parse_ss(raw_data=node_data["server"])
-        elif _type == "vmess":
+        elif self.node_type in (NodeTypeEnum.VMess, NodeTypeEnum.VLess):
             self.node = self.parse_vmess(raw_data=node_data["server"])
-        elif _type == "trojan":
+        elif self.node_type == NodeTypeEnum.Trojan:
             self.node = self.parse_trojan(raw_data=node_data["server"])
+        else:
+            raise
 
         return self.node
 
-    def parse_ss(self, raw_data: str) -> SSNode:
+    def parse_ss(self, raw_data: str) -> entities.SSNode:
         """
         解析SS信息
         :param raw_data:
@@ -55,7 +58,7 @@ class SSPanelAPI(BaseAPI):
         """
         parts = raw_data.split(";")
         ip = parts[0]
-        extra = parts[1].split("|")
+        extra = parts[1].split("|") if len(parts) >= 2 else []
 
         conn_port, listen_port = 0, 0
         for item in extra:
@@ -63,13 +66,16 @@ class SSPanelAPI(BaseAPI):
             if key == "":
                 continue
 
+            # 目前拿不到这部分信息，即便配置了也没用
             if key == "port":
                 conn_port, listen_port = value.split("#", maxsplit=1)
 
-        node = SSNode(node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port))
+        node = entities.SSNode(
+            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port)
+        )
         return node
 
-    def parse_vmess(self, raw_data: str) -> Union[VMessNode, VLessNode]:
+    def parse_vmess(self, raw_data: str) -> Union[entities.VMessNode, entities.VLessNode]:
         """
         解析VMess信息
         :return:
@@ -107,7 +113,7 @@ class SSPanelAPI(BaseAPI):
                 port = int(value)
 
         if is_vless:
-            node = VLessNode(
+            node = entities.VLessNode(
                 node_id=self.node_id,
                 panel_name=urlparse(self.endpoint).netloc,
                 listen_port=int(port),
@@ -119,7 +125,7 @@ class SSPanelAPI(BaseAPI):
                 host=host,
             )
         else:
-            node = VMessNode(
+            node = entities.VMessNode(
                 node_id=self.node_id,
                 panel_name=urlparse(self.endpoint).netloc,
                 listen_port=int(port),
@@ -132,7 +138,7 @@ class SSPanelAPI(BaseAPI):
             )
         return node
 
-    def parse_trojan(self, raw_data: str) -> TrojanNode:
+    def parse_trojan(self, raw_data: str) -> entities.TrojanNode:
         """
         解析Trojan配置
         :param raw_data:
@@ -159,7 +165,7 @@ class SSPanelAPI(BaseAPI):
                 if value == "true":
                     enable_vless = True
 
-        node = TrojanNode(
+        node = entities.TrojanNode(
             node_id=self.node_id,
             panel_name=urlparse(self.endpoint).netloc,
             listen_port=int(listen_port),
@@ -169,7 +175,7 @@ class SSPanelAPI(BaseAPI):
         )
         return node
 
-    async def fetch_user_list(self) -> List[GenericUser]:
+    async def fetch_user_list(self) -> List[entities.GenericUser]:
         req = await self.session.get(url=self.fetch_user_list_api, params={"key": self.mu_key, "node_id": self.node_id})
         result = req.json()
         ret = result["ret"]
@@ -184,15 +190,37 @@ class SSPanelAPI(BaseAPI):
             logger.warning(f"未获取到有效用户")
             return []
 
-    def parse_user(self, data: dict) -> GenericUser:
+    def parse_user(self, data: dict) -> entities.GenericUser:
         """
         从API数据解析用户信息
         :return:
         """
         uid = data.get("id", -1)
-        email = data.get("email", f"{uid}")
-        sspanel_user = SSPanelUser(id=uid, email=email, password=data.get("passwd", ""))
-        return sspanel_user
+        email = data.get("email", f"{uid}@{urlparse(self.endpoint).netloc}")
+        speed_limit = data.get("node_speedlimit", 0)
+
+        if self.node_type == NodeTypeEnum.Shadowsocks:
+            user = entities.SSUser(
+                user_id=uid,
+                email=email,
+                speed_limit=speed_limit,
+                password=data.get("passwd", ""),
+                method=data.get("method"),
+                is_multi_user=data.get("is_multi_user", 0),
+            )
+            if user.is_multi_user > 0 and self.multi_user is None:
+                self.multi_user = user
+
+        elif self.node_type == NodeTypeEnum.VMess:
+            user = entities.VMessUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+        elif self.node_type == NodeTypeEnum.VLess:
+            user = entities.VLessUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+        elif self.node_type == NodeTypeEnum.Trojan:
+            user = entities.TrojanUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+        else:
+            raise
+
+        return user
 
     async def report_user_stats(self, user_data: list = None) -> None:
         if user_data is None:
