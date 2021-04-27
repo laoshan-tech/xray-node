@@ -25,6 +25,7 @@ uvloop = [
 grpcio-status = "^1.37.0"
 click = "^7.1.2"
 tortoise-orm = "^0.17.2"
+pytest-httpserver = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"

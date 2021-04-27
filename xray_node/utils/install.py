@@ -18,7 +18,7 @@ class XrayFile(object):
         :param use_cdn: 是否使用CDN加速下载
         """
         if install_path is None:
-            self.path = Path().home() / "xray-node"
+            self.path = Path.home() / "xray-node"
         else:
             self.path = install_path
 

@@ -1,17 +1,26 @@
 class GenericUser(object):
     def __init__(self, user_id: int, email: str, speed_limit: int):
         self.user_id = user_id
+        self.email = email
         self.speed_limit = speed_limit
 
 
 class SSUser(GenericUser):
     def __init__(
-        self, user_id: int, email: str, speed_limit: int, password: str, method: str, is_multi_user: bool = False
+        self,
+        user_id: int,
+        email: str,
+        speed_limit: int,
+        password: str,
+        method: str,
+        is_multi_user: bool = False,
+        listen_port: int = 0,
     ):
         super(SSUser, self).__init__(user_id=user_id, email=email, speed_limit=speed_limit)
         self.method = method
         self.password = password
         self.is_multi_user = is_multi_user
+        self.listen_port = listen_port
 
 
 class VMessUser(GenericUser):
@@ -39,8 +48,9 @@ class GenericNode(object):
 
 
 class SSNode(GenericNode):
-    def __init__(self, node_id: int, panel_name: str, listen_port: int):
+    def __init__(self, node_id: int, panel_name: str, listen_port: int, method: str):
         super(SSNode, self).__init__(node_id=node_id, panel_name=panel_name, listen_port=listen_port)
+        self.method = method
 
 
 class VMessNode(GenericNode):

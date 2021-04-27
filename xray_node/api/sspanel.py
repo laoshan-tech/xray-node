@@ -21,7 +21,7 @@ class SSPanelAPI(BaseAPI):
 
         self.node = None
         self.node_type = None
-        self.multi_user = None
+        self.multi_user: Union[None, entities.SSUser] = None
         self.__prepare_api()
 
     def __prepare_api(self) -> None:
@@ -29,7 +29,9 @@ class SSPanelAPI(BaseAPI):
         self.fetch_user_list_api = urljoin(base=self.endpoint, url=f"/mod_mu/users")
         self.report_user_stats_api = self.endpoint
 
-    async def fetch_node_info(self) -> entities.GenericNode:
+    async def fetch_node_info(
+        self,
+    ) -> Union[entities.SSNode, entities.VMessNode, entities.VLessNode, entities.TrojanNode]:
         req = await self.session.get(url=self.fetch_node_info_api, params={"key": self.mu_key})
         result = req.json()
         ret = result["ret"]
@@ -48,6 +50,7 @@ class SSPanelAPI(BaseAPI):
         else:
             raise
 
+        self.handle_ss_multi_user()
         return self.node
 
     def parse_ss(self, raw_data: str) -> entities.SSNode:
@@ -71,7 +74,7 @@ class SSPanelAPI(BaseAPI):
                 conn_port, listen_port = value.split("#", maxsplit=1)
 
         node = entities.SSNode(
-            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port)
+            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port), method="none"
         )
         return node
 
@@ -179,16 +182,19 @@ class SSPanelAPI(BaseAPI):
         req = await self.session.get(url=self.fetch_user_list_api, params={"key": self.mu_key, "node_id": self.node_id})
         result = req.json()
         ret = result["ret"]
-        if ret != 0:
+        if ret != 1:
             raise FetchNodeInfoError(msg=result["data"])
 
         user_data = req.json()["data"]
         if len(user_data) > 0:
             logger.info(f"获取用户信息成功，本次获取到 {len(user_data)} 个用户信息")
-            return [self.parse_user(data=u) for u in user_data]
+            users = [self.parse_user(data=u) for u in user_data]
         else:
             logger.warning(f"未获取到有效用户")
-            return []
+            users = []
+
+        self.handle_ss_multi_user()
+        return users
 
     def parse_user(self, data: dict) -> entities.GenericUser:
         """
@@ -199,6 +205,9 @@ class SSPanelAPI(BaseAPI):
         email = data.get("email", f"{uid}@{urlparse(self.endpoint).netloc}")
         speed_limit = data.get("node_speedlimit", 0)
 
+        if self.node_type is None:
+            raise Exception("节点信息未获取")
+
         if self.node_type == NodeTypeEnum.Shadowsocks:
             user = entities.SSUser(
                 user_id=uid,
@@ -207,6 +216,7 @@ class SSPanelAPI(BaseAPI):
                 password=data.get("passwd", ""),
                 method=data.get("method"),
                 is_multi_user=data.get("is_multi_user", 0),
+                listen_port=data.get("port", 0),
             )
             if user.is_multi_user > 0 and self.multi_user is None:
                 self.multi_user = user
@@ -221,6 +231,15 @@ class SSPanelAPI(BaseAPI):
             raise
 
         return user
+
+    def handle_ss_multi_user(self):
+        """
+        SS单端口多用户时需要单独处理承载用户的情况
+        :return:
+        """
+        if self.multi_user and self.node_type == NodeTypeEnum.Shadowsocks and self.node:
+            self.node.listen_port = self.multi_user.listen_port
+            self.node.method = self.multi_user.method
 
     async def report_user_stats(self, user_data: list = None) -> None:
         if user_data is None:

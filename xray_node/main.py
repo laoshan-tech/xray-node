@@ -180,7 +180,7 @@ def cli():
 @click.option(
     "-p",
     "--path",
-    default=Path().home() / "xray-node",
+    default=Path.home() / "xray-node",
     type=click.Path(file_okay=False, dir_okay=True),
     help="xray-core installation path.",
 )
@@ -196,7 +196,7 @@ def run(path):
 @click.option(
     "-p",
     "--path",
-    default=Path().home() / "xray-node",
+    default=Path.home() / "xray-node",
     type=click.Path(file_okay=False, dir_okay=True),
     help="xray-core installation path.",
 )
