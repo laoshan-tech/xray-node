@@ -123,3 +123,16 @@ class TrojanNode(GenericNode):
         self.host = host
         self.enable_xtls = enable_xtls
         self.enable_vless = enable_vless
+
+
+class SSPanelOnlineIPData(object):
+    def __init__(self, user_id: int, ip: str):
+        self.user_id = user_id
+        self.ip = ip
+
+
+class SSPanelTrafficData(object):
+    def __init__(self, user_id: int, upload: int, download: int):
+        self.user_id = user_id
+        self.upload = upload
+        self.download = download

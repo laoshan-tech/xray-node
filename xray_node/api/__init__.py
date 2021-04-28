@@ -11,7 +11,7 @@ class BaseAPI(object):
     def __init__(self, endpoint: str = ""):
         self.endpoint = endpoint
         self.fetch_user_list_api = ""
-        self.report_user_stats_api = ""
+        self.report_user_online_ip_api = ""
 
         self.__prepare_api()
 

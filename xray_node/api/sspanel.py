@@ -1,9 +1,12 @@
 import logging
+import time
 from typing import List, Union
 from urllib.parse import urljoin, urlparse
 
+import psutil
+
 from xray_node.api import BaseAPI, entities
-from xray_node.exceptions import FetchNodeInfoError
+from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError
 from xray_node.utils.consts import SSPANEL_NODE_TYPE, NodeTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -27,7 +30,9 @@ class SSPanelAPI(BaseAPI):
     def __prepare_api(self) -> None:
         self.fetch_node_info_api = urljoin(base=self.endpoint, url=f"/mod_mu/nodes/{self.node_id}/info")
         self.fetch_user_list_api = urljoin(base=self.endpoint, url=f"/mod_mu/users")
-        self.report_user_stats_api = self.endpoint
+        self.report_node_stats_api = urljoin(base=self.endpoint, url=f"/mod_mu/nodes/{self.node_id}/info")
+        self.report_user_online_ip_api = urljoin(base=self.endpoint, url=f"/mod_mu/users/aliveip")
+        self.report_user_traffic_api = urljoin(base=self.endpoint, url=f"/mod_mu/users/traffic")
 
     async def fetch_node_info(
         self,
@@ -52,6 +57,22 @@ class SSPanelAPI(BaseAPI):
 
         self.handle_ss_multi_user()
         return self.node
+
+    async def report_node_stats(self) -> bool:
+        """
+        上报节点状态
+        :return:
+        """
+        load = psutil.getloadavg()
+        post_body = {"Uptime": time.time() - psutil.boot_time(), "Load": " ".join(load)}
+
+        req = await self.session.post(url=self.report_node_stats_api, params={"key": self.mu_key}, json=post_body)
+        result = req.json()
+        ret = result["ret"]
+        if ret != 1:
+            raise ReportNodeStatsError(msg=result["data"])
+        else:
+            return True
 
     def parse_ss(self, raw_data: str) -> entities.SSNode:
         """
@@ -240,15 +261,48 @@ class SSPanelAPI(BaseAPI):
         if self.multi_user and self.node_type == NodeTypeEnum.Shadowsocks and self.node:
             self.node.listen_port = self.multi_user.listen_port
             self.node.method = self.multi_user.method
+        else:
+            logger.debug("不满足合并单端口承载用户信息条件，跳过")
 
     async def report_user_stats(self, user_data: list = None) -> None:
-        if user_data is None:
-            user_data = []
+        """
+        上报用户相关信息
+        :param user_data:
+        :return:
+        """
+        await self._report_user_alive_ip()
+        await self._report_user_traffic()
 
-        req = await self.session.post(url=self.report_user_stats_api, json={"user_stats": user_data})
-        status = req.json()["status"]
-        message = req.json()["message"]
-        if status:
-            logger.info(f"上报用户信息成功")
+    async def _report_user_alive_ip(self, online_ip_data: List[entities.SSPanelOnlineIPData]) -> bool:
+        """
+        上报用户在线IP
+        :param online_ip_data:
+        :return:
+        """
+        post_body = {}
+        req = await self.session.post(
+            url=self.report_user_online_ip_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
+        )
+        result = req.json()
+        ret = result["ret"]
+        if ret != 1:
+            raise ReportNodeStatsError(msg=result["data"])
         else:
-            logger.info(f"上报用户信息异常 {message}")
+            return True
+
+    async def _report_user_traffic(self, traffic_data: List[entities.SSPanelTrafficData]) -> bool:
+        """
+        上报用户流量
+        :param traffic_data:
+        :return:
+        """
+        post_body = {}
+        req = await self.session.post(
+            url=self.report_user_traffic_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
+        )
+        result = req.json()
+        ret = result["ret"]
+        if ret != 1:
+            raise ReportNodeStatsError(msg=result["data"])
+        else:
+            return True

@@ -35,3 +35,8 @@ class AddressAlreadyInUseError(XrayError):
 class FetchNodeInfoError(APIError):
     def __init__(self, msg):
         super(FetchNodeInfoError, self).__init__(msg=msg)
+
+
+class ReportNodeStatsError(APIError):
+    def __init__(self, msg):
+        super(ReportNodeStatsError, self).__init__(msg=msg)
