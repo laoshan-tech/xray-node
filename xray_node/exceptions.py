@@ -32,6 +32,11 @@ class AddressAlreadyInUseError(XrayError):
         self.port = port
 
 
+class UnsupportedAPI(APIError):
+    def __init__(self, msg):
+        super(UnsupportedAPI, self).__init__(msg=msg)
+
+
 class FetchNodeInfoError(APIError):
     def __init__(self, msg):
         super(FetchNodeInfoError, self).__init__(msg=msg)
@@ -40,3 +45,8 @@ class FetchNodeInfoError(APIError):
 class ReportNodeStatsError(APIError):
     def __init__(self, msg):
         super(ReportNodeStatsError, self).__init__(msg=msg)
+
+
+class ReportUserTrafficError(APIError):
+    def __init__(self, msg):
+        super(ReportUserTrafficError, self).__init__(msg=msg)

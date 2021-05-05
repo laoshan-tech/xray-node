@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 import psutil
 
 from xray_node.api import BaseAPI, entities
-from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError
+from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError, ReportUserTrafficError
 from xray_node.utils.consts import SSPANEL_NODE_TYPE, NodeTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -264,22 +264,13 @@ class SSPanelAPI(BaseAPI):
         else:
             logger.debug("不满足合并单端口承载用户信息条件，跳过")
 
-    async def report_user_stats(self, user_data: list = None) -> None:
-        """
-        上报用户相关信息
-        :param user_data:
-        :return:
-        """
-        await self._report_user_alive_ip()
-        await self._report_user_traffic()
-
-    async def _report_user_alive_ip(self, online_ip_data: List[entities.SSPanelOnlineIPData]) -> bool:
+    async def report_user_stats(self, stats_data: List[entities.SSPanelOnlineIPData]) -> bool:
         """
         上报用户在线IP
-        :param online_ip_data:
+        :param stats_data:
         :return:
         """
-        post_body = {}
+        post_body = {"data": [{"ip": d.ip, "user_id": d.user_id} for d in stats_data]}
         req = await self.session.post(
             url=self.report_user_online_ip_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
         )
@@ -290,19 +281,19 @@ class SSPanelAPI(BaseAPI):
         else:
             return True
 
-    async def _report_user_traffic(self, traffic_data: List[entities.SSPanelTrafficData]) -> bool:
+    async def report_user_traffic(self, traffic_data: List[entities.SSPanelTrafficData]) -> bool:
         """
         上报用户流量
         :param traffic_data:
         :return:
         """
-        post_body = {}
+        post_body = {"data": [{"user_id": d.user_id, "u": d.upload, "d": d.download} for d in traffic_data]}
         req = await self.session.post(
             url=self.report_user_traffic_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
         )
         result = req.json()
         ret = result["ret"]
         if ret != 1:
-            raise ReportNodeStatsError(msg=result["data"])
+            raise ReportUserTrafficError(msg=result["data"])
         else:
             return True

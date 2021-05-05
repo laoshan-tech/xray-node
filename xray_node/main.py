@@ -4,8 +4,10 @@ from pathlib import Path
 
 import click
 
+from xray_node.api import get_api_cls_by_name
 from xray_node.config import Config
 from xray_node.core.xray import Xray
+from xray_node.mdb import init_db
 from xray_node.utils.http import client
 from xray_node.utils.install import XrayFile, install_xray, is_xray_installed
 
@@ -19,6 +21,7 @@ class XrayNode(object):
         self.force_update = force_update
         self.use_cdn = use_cdn
         self.xray_f = XrayFile(install_path=self.install_path)
+        self.api_cls = None
 
     def __init_config(self) -> None:
         """
@@ -78,9 +81,12 @@ class XrayNode(object):
 
     async def __cleanup(self) -> None:
         """
-
+        清理任务
         :return:
         """
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        [task.cancel() for task in tasks]
+
         await self.xray.stop()
         if not client.is_closed:
             await client.aclose()
@@ -92,8 +98,7 @@ class XrayNode(object):
         """
         logger.info("正在关闭 Xray 服务")
         self.loop.run_until_complete(self.__cleanup())
-        if self.loop.is_running():
-            self.loop.stop()
+        self.loop.stop()
 
     def __run_loop(self) -> None:
         """
@@ -117,7 +122,10 @@ class XrayNode(object):
         远程模式同步用户
         :return:
         """
-        pass
+        if self.api_cls is None:
+            self.api_cls = get_api_cls_by_name(panel_type=self.config.panel_type)
+
+        users = await self.api_cls.fetch_user_list()
 
     async def __user_man_cron(self):
         """
@@ -145,6 +153,7 @@ class XrayNode(object):
 
             return
 
+        await init_db()
         await self.xray.start()
         await self.__user_man_cron()
 

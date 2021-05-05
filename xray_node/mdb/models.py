@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import json
-from typing import Any, Union, Type
+from typing import Any, Union, Type, List
 
 from tortoise import fields
 from tortoise.models import Model
+
+from xray_node.api import entities
 
 
 class IPSetField(fields.CharField):
@@ -39,6 +43,30 @@ class User(Model):
 
     def __str__(self):
         return f"User-{self.panel_name}-{self.email}"
+
+    @classmethod
+    def _create_or_update_from_data(
+        cls,
+        data: Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser],
+    ):
+        """
+        根据数据创建或更新用户
+        :param data:
+        :return:
+        """
+        cls.get_or_create(user_id=data.user_id)
+
+    @classmethod
+    def create_or_update_from_data_list(
+        cls,
+        user_data_list: List[Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]],
+    ):
+        """
+        根据数据列表创建或更新用户
+        :param user_data_list:
+        :return:
+        """
+        pass
 
 
 class Node(Model):

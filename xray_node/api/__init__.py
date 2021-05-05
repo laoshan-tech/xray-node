@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import Union, Type
+
+from xray_node.api.sspanel import SSPanelAPI
+from xray_node.api.v2board import V2BoardAPI
+from xray_node.exceptions import UnsupportedAPI
 from xray_node.utils import http
 
 
@@ -36,10 +43,33 @@ class BaseAPI(object):
         """
         raise NotImplementedError("fetch_node_info method not defined")
 
-    async def report_user_stats(self, user_data: list) -> None:
+    async def report_user_traffic(self, traffic_data: list) -> bool:
         """
-        上报user信息
-        :param user_data:
+        上报用户流量信息
+        :param traffic_data:
+        :return:
+        """
+        raise NotImplementedError("report_user_traffic method not defined")
+
+    async def report_user_stats(self, stats_data: list) -> bool:
+        """
+        上报用户状态信息
+        :param stats_data:
         :return:
         """
         raise NotImplementedError("report_user_stats method not defined")
+
+
+def get_api_cls_by_name(panel_type: str) -> Union[Type[SSPanelAPI], Type[V2BoardAPI]]:
+    """
+    获取API操作类
+    :param panel_type:
+    :return:
+    """
+    panel_dict = {"sspanel": SSPanelAPI, "v2board": V2BoardAPI}
+
+    cls = panel_dict.get(panel_type)
+    if cls is None:
+        raise UnsupportedAPI(msg=panel_type)
+    else:
+        return cls

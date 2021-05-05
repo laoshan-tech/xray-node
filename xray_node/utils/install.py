@@ -44,7 +44,7 @@ class XrayFile(object):
         xray-node配置路径
         :return:
         """
-        return self.path / "xnode.yaml"
+        return self.path / "xnode.toml"
 
     @property
     def xray_install_path(self) -> Path:

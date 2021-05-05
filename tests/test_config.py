@@ -8,7 +8,7 @@ from xray_node.config import init_config, Config
 class TestConfig(object):
     @pytest.mark.asyncio
     async def test_init_config(self):
-        fn = Path("./xnode.yaml")
+        fn = Path("./xnode.toml")
         init_config(target=fn)
         assert fn.exists()
 

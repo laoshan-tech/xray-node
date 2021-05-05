@@ -10,13 +10,19 @@ def init_config(target: Path):
     :param target:
     :return:
     """
-    template = """# xray-node 配置文件
+    template = """# xray-node
 
 [log]
-level = "info" # 日志等级，debug/info/warning/error
+level = "info" # debug/info/warning/error
 
 [user]
-mode = "local" # 用户管理模式，local 通过本地文件管理，remote 通过面板管理
+mode = "local" # local/remote
+
+[panel]
+type = "sspanel" # sspanel/v2board/django-sspanel
+endpoint = "http://xxx.xxxx.com/"
+node_id = 1
+api_key = "key"
 
 [[user.clients]]
 type = "shadowsocks"
@@ -43,7 +49,7 @@ port = 1234
 protocol = "shadowsocks"
 """
     target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-    with open(target, "w") as f:
+    with open(target, "w", encoding="utf-8") as f:
         f.write(template)
 
 
@@ -55,17 +61,22 @@ class Config(object):
         if cfg:
             self.fn = cfg
         else:
-            self.fn = Path("./xnode.yaml")
+            self.fn = Path("./xnode.toml")
 
         if not self.fn.exists():
             init_config(target=self.fn)
 
-        with open(self.fn, "r") as f:
+        with open(self.fn, "r", encoding="utf-8") as f:
             self.content = tomlkit.parse(f.read())
 
         self.log_level = self.content["log"]["level"]
 
         self.user_mode = self.content["user"]["mode"]
+        if self.user_mode == "remote":
+            self.panel_type = self.content["panel"]["type"]
+            self.endpoint = self.content["panel"]["endpoint"]
+            self.api_key = self.content["panel"]["api_key"]
+            self.node_id = self.content["panel"]["node_id"]
 
         self.clients = self.content["user"]["clients"]
         self.inbounds = self.content["xray"]["inbounds"]
