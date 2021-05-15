@@ -1,6 +1,7 @@
 class GenericUser(object):
-    def __init__(self, user_id: int, email: str, speed_limit: int):
+    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int):
         self.user_id = user_id
+        self.panel_name = panel_name
         self.email = email
         self.speed_limit = speed_limit
 
@@ -9,6 +10,7 @@ class SSUser(GenericUser):
     def __init__(
         self,
         user_id: int,
+        panel_name: str,
         email: str,
         speed_limit: int,
         password: str,
@@ -16,7 +18,7 @@ class SSUser(GenericUser):
         is_multi_user: bool = False,
         listen_port: int = 0,
     ):
-        super(SSUser, self).__init__(user_id=user_id, email=email, speed_limit=speed_limit)
+        super(SSUser, self).__init__(user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit)
         self.method = method
         self.password = password
         self.is_multi_user = is_multi_user
@@ -24,19 +26,23 @@ class SSUser(GenericUser):
 
 
 class VMessUser(GenericUser):
-    def __init__(self, user_id: int, email: str, speed_limit: int, uuid: str):
-        super(VMessUser, self).__init__(user_id=user_id, email=email, speed_limit=speed_limit)
+    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
+        super(VMessUser, self).__init__(user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit)
         self.uuid = uuid
 
 
 class VLessUser(VMessUser):
-    def __init__(self, user_id: int, email: str, speed_limit: int, uuid: str):
-        super(VLessUser, self).__init__(user_id=user_id, email=email, speed_limit=speed_limit, uuid=uuid)
+    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
+        super(VLessUser, self).__init__(
+            user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit, uuid=uuid
+        )
 
 
 class TrojanUser(VMessUser):
-    def __init__(self, user_id: int, email: str, speed_limit: int, uuid: str):
-        super(TrojanUser, self).__init__(user_id=user_id, email=email, speed_limit=speed_limit, uuid=uuid)
+    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
+        super(TrojanUser, self).__init__(
+            user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit, uuid=uuid
+        )
 
 
 class GenericNode(object):

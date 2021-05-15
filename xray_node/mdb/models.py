@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Union, Type, List
 
 from tortoise import fields
 from tortoise.models import Model
+from tortoise.transactions import atomic
 
 from xray_node.api import entities
+from xray_node.exceptions import UnsupportedUser
+
+logger = logging.getLogger(__name__)
 
 
 class IPSetField(fields.CharField):
@@ -30,19 +35,44 @@ class User(Model):
     panel_name = fields.CharField(description="面板名称", max_length=256)
     user_id = fields.BigIntField(description="面板系统内的ID")
     email = fields.CharField(description="邮箱", max_length=256)
-    uuid = fields.CharField(description="UUID", max_length=128)
-    port = fields.IntField(description="端口", index=True)
-    method = fields.CharField(description="加密方法", max_length=64)
-    password = fields.CharField(description="密码", unique=True, max_length=128)
+    uuid = fields.CharField(description="UUID", default="", max_length=128)
+    port = fields.IntField(description="端口", default=0, index=True)
+    method = fields.CharField(description="加密方法", default="", max_length=64)
+    password = fields.CharField(description="密码", default="", max_length=128)
     upload_traffic = fields.BigIntField(description="上传流量", default=0)
     download_traffic = fields.BigIntField(description="下载流量", default=0)
     total_traffic = fields.BigIntField(description="总流量", default=0)
-    last_use_time = fields.DatetimeField(description="上次使用时间", null=True, index=True)
+    last_use_time = fields.DatetimeField(description="上次使用时间", auto_now=True, null=True, index=True)
     conn_ip_set = IPSetField(description="连接IP", default=set(), max_length=65535)
     is_deleted = fields.BooleanField(description="是否删除", default=False, index=True)
 
     def __str__(self):
         return f"User-{self.panel_name}-{self.email}"
+
+    @classmethod
+    def _gen_obj_from_user(
+        cls, u: Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]
+    ) -> User:
+        """
+        根据数据生成ORM对象
+        :param u:
+        :return:
+        """
+        if isinstance(u, entities.SSUser):
+            user_obj = cls(
+                panel_name=u.panel_name,
+                user_id=u.user_id,
+                email=u.email,
+                port=u.listen_port,
+                method=u.method,
+                password=u.password,
+            )
+        elif isinstance(u, (entities.VMessUser, entities.VLessUser, entities.TrojanUser)):
+            user_obj = cls(panel_name=u.panel_name, user_id=u.user_id, email=u.email, uuid=u.uuid)
+        else:
+            raise UnsupportedUser(msg=f"{type(u).__name__}")
+
+        return user_obj
 
     @classmethod
     def _create_or_update_from_data(
@@ -57,7 +87,8 @@ class User(Model):
         cls.get_or_create(user_id=data.user_id)
 
     @classmethod
-    def create_or_update_from_data_list(
+    @atomic
+    async def create_or_update_from_data_list(
         cls,
         user_data_list: List[Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]],
     ):
@@ -66,7 +97,13 @@ class User(Model):
         :param user_data_list:
         :return:
         """
-        pass
+        if await cls.all().count() < 1:
+            logger.info(f"User表内无数据，全量插入")
+            new_users = [cls._gen_obj_from_user(u=u) for u in user_data_list]
+            await cls.bulk_create(objects=new_users)
+        else:
+            db_user_dict = {f"{u.panel_name}-{u.user_id}": u for u in await cls.filter(is_deleted=False).all()}
+            enable_user_list = []
 
 
 class Node(Model):

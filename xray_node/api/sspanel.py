@@ -232,6 +232,7 @@ class SSPanelAPI(BaseAPI):
         if self.node_type == NodeTypeEnum.Shadowsocks:
             user = entities.SSUser(
                 user_id=uid,
+                panel_name=self.node.panel_name,
                 email=email,
                 speed_limit=speed_limit,
                 password=data.get("passwd", ""),
@@ -243,11 +244,29 @@ class SSPanelAPI(BaseAPI):
                 self.multi_user = user
 
         elif self.node_type == NodeTypeEnum.VMess:
-            user = entities.VMessUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+            user = entities.VMessUser(
+                user_id=uid,
+                panel_name=self.node.panel_name,
+                email=email,
+                speed_limit=speed_limit,
+                uuid=data.get("uuid", ""),
+            )
         elif self.node_type == NodeTypeEnum.VLess:
-            user = entities.VLessUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+            user = entities.VLessUser(
+                user_id=uid,
+                panel_name=self.node.panel_name,
+                email=email,
+                speed_limit=speed_limit,
+                uuid=data.get("uuid", ""),
+            )
         elif self.node_type == NodeTypeEnum.Trojan:
-            user = entities.TrojanUser(user_id=uid, email=email, speed_limit=speed_limit, uuid=data.get("uuid", ""))
+            user = entities.TrojanUser(
+                user_id=uid,
+                panel_name=self.node.panel_name,
+                email=email,
+                speed_limit=speed_limit,
+                uuid=data.get("uuid", ""),
+            )
         else:
             raise
 

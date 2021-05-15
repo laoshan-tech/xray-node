@@ -8,6 +8,16 @@ class APIError(Exception):
         self.msg = msg
 
 
+class DataError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+
+class UnsupportedUser(DataError):
+    def __init__(self, msg):
+        super(UnsupportedUser, self).__init__(msg=msg)
+
+
 class EmailExistsError(XrayError):
     def __init__(self, detail, email: str):
         super(EmailExistsError, self).__init__(detail)

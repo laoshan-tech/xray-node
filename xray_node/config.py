@@ -1,7 +1,14 @@
+import logging
 import threading
 from pathlib import Path
+from typing import List, Union
 
 import tomlkit
+
+from xray_node.api import entities
+from xray_node.utils.consts import NodeTypeEnum
+
+logger = logging.getLogger(__name__)
 
 
 def init_config(target: Path):
@@ -27,17 +34,25 @@ api_key = "key"
 [[user.clients]]
 type = "shadowsocks"
 password = "aabbccdd"
+speed_limit = 0
 cipher_type = "aes-256-gcm"
 
 [[user.clients]]
 type = "shadowsocks"
 password = "aabbccdd"
+speed_limit = 0
 cipher_type = "aes-256-gcm"
 
 [[user.clients]]
 type = "shadowsocks"
 password = "aabbccdd"
+speed_limit = 0
 cipher_type = "aes-256-gcm"
+
+[[user.clients]]
+type = "vmess"
+uuid = "595abb61-be40-4cee-afb4-d889dcd510cb"
+speed_limit = 0
 
 [xray.api]
 host = "127.0.0.1"
@@ -61,7 +76,7 @@ class Config(object):
         if cfg:
             self.fn = cfg
         else:
-            self.fn = Path("./xnode.toml")
+            self.fn = Path.home() / "xnode.toml"
 
         if not self.fn.exists():
             init_config(target=self.fn)
@@ -90,3 +105,61 @@ class Config(object):
                 if not hasattr(Config, "_instance"):
                     Config._instance = super(Config, cls).__new__(cls, *args, **kwargs)
         return Config._instance
+
+    def load_local_users(
+        self,
+    ) -> List[Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]]:
+        """
+        通过配置文件加载用户信息
+        :return:
+        """
+        clients = self.content["user"]["clients"]
+
+        users = []
+        for idx, c in enumerate(clients):
+            try:
+                if c["type"] in (NodeTypeEnum.Shadowsocks.value, NodeTypeEnum.ShadowsocksR.value):
+                    u = entities.SSUser(
+                        user_id=idx,
+                        panel_name="local",
+                        email=f"{idx}@local",
+                        speed_limit=c.get("speed_limit", 0),
+                        password=c["password"],
+                        method=c["cipher_type"],
+                    )
+                    users.append(u)
+                elif c["type"] == NodeTypeEnum.VMess.value:
+                    u = entities.VMessUser(
+                        user_id=idx,
+                        panel_name="local",
+                        email=f"{idx}@local",
+                        speed_limit=c.get("speed_limit", 0),
+                        uuid=c["uuid"],
+                    )
+                    users.append(u)
+                elif c["type"] == NodeTypeEnum.VLess.value:
+                    u = entities.VLessUser(
+                        user_id=idx,
+                        panel_name="local",
+                        email=f"{idx}@local",
+                        speed_limit=c.get("speed_limit", 0),
+                        uuid=c["uuid"],
+                    )
+                    users.append(u)
+                elif c["type"] == NodeTypeEnum.Trojan.value:
+                    u = entities.TrojanUser(
+                        user_id=idx,
+                        panel_name="local",
+                        email=f"{idx}@local",
+                        speed_limit=c.get("speed_limit", 0),
+                        uuid=c["uuid"],
+                    )
+                    users.append(u)
+                else:
+                    logger.error(f"不支持的用户类型 {c}")
+                    continue
+            except KeyError as e:
+                logger.error(f"从配置文件中加载用户时出错 {e}")
+                continue
+
+        return users

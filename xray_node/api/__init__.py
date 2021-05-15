@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Union, Type
+from typing import Union, Type, TYPE_CHECKING
 
-from xray_node.api.sspanel import SSPanelAPI
-from xray_node.api.v2board import V2BoardAPI
 from xray_node.exceptions import UnsupportedAPI
 from xray_node.utils import http
+
+if TYPE_CHECKING:
+    from xray_node.api.sspanel import SSPanelAPI
+    from xray_node.api.v2board import V2BoardAPI
 
 
 class BaseAPI(object):
@@ -66,9 +68,12 @@ def get_api_cls_by_name(panel_type: str) -> Union[Type[SSPanelAPI], Type[V2Board
     :param panel_type:
     :return:
     """
-    panel_dict = {"sspanel": SSPanelAPI, "v2board": V2BoardAPI}
+    from xray_node.api.sspanel import SSPanelAPI
+    from xray_node.api.v2board import V2BoardAPI
 
-    cls = panel_dict.get(panel_type)
+    panel_cls_dict = {"sspanel": SSPanelAPI, "v2board": V2BoardAPI}
+
+    cls = panel_cls_dict.get(panel_type)
     if cls is None:
         raise UnsupportedAPI(msg=panel_type)
     else:

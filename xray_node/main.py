@@ -1,13 +1,16 @@
 import asyncio
 import logging
+import os
+import signal
 from pathlib import Path
 
 import click
+import psutil
 
 from xray_node.api import get_api_cls_by_name
 from xray_node.config import Config
 from xray_node.core.xray import Xray
-from xray_node.mdb import init_db
+from xray_node.mdb import init_db, models
 from xray_node.utils.http import client
 from xray_node.utils.install import XrayFile, install_xray, is_xray_installed
 
@@ -77,6 +80,10 @@ class XrayNode(object):
 
         self.xray = Xray(xray_f=self.xray_f)
 
+        signals = (signal.SIGTERM, signal.SIGINT)
+        for s in signals:
+            self.loop.add_signal_handler(s, lambda s=s: asyncio.create_task(self.__cleanup()))
+
         self.__prepared = True
 
     async def __cleanup(self) -> None:
@@ -84,38 +91,23 @@ class XrayNode(object):
         清理任务
         :return:
         """
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        [task.cancel() for task in tasks]
-
+        logger.info("正在关闭 Xray 服务")
         await self.xray.stop()
         if not client.is_closed:
             await client.aclose()
 
-    def __shutdown(self) -> None:
-        """
-        停止所有服务
-        :return:
-        """
-        logger.info("正在关闭 Xray 服务")
-        self.loop.run_until_complete(self.__cleanup())
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        [task.cancel() for task in tasks]
+        await asyncio.gather(*tasks, return_exceptions=True)
         self.loop.stop()
-
-    def __run_loop(self) -> None:
-        """
-        启动事件循环
-        :return:
-        """
-        try:
-            self.loop.run_forever()
-        except KeyboardInterrupt:
-            self.__shutdown()
 
     async def __sync_user_from_local(self):
         """
         本地模式同步用户
         :return:
         """
-        pass
+        users = self.config.load_local_users()
+        await models.User.create_or_update_from_data_list(user_data_list=users)
 
     async def __sync_user_from_remote(self):
         """
@@ -123,23 +115,26 @@ class XrayNode(object):
         :return:
         """
         if self.api_cls is None:
-            self.api_cls = get_api_cls_by_name(panel_type=self.config.panel_type)
+            cls = get_api_cls_by_name(panel_type=self.config.panel_type)
+            self.api_cls = cls(endpoint=self.config.endpoint, mu_key=self.config.api_key, node_id=self.config.node_id)
 
         users = await self.api_cls.fetch_user_list()
+        await models.User.create_or_update_from_data_list(user_data_list=users)
 
     async def __user_man_cron(self):
         """
         用户管理
         :return:
         """
-        if self.config.user_mode == "local":
-            logger.info(f"使用本地配置文件 {self.config.fn} 加载用户信息")
-            await self.__sync_user_from_local()
-        elif self.config.user_mode == "remote":
-            logger.info(f"使用远程服务加载用户信息")
-            await self.__sync_user_from_remote()
+        while True:
+            if self.config.user_mode == "local":
+                logger.info(f"使用本地配置文件 {self.config.fn} 加载用户信息")
+                await self.__sync_user_from_local()
+            elif self.config.user_mode == "remote":
+                logger.info(f"使用远程服务加载用户信息")
+                await self.__sync_user_from_remote()
 
-        self.loop.call_later(60, self.loop.create_task, self.__user_man_cron())
+            await asyncio.sleep(60)
 
     async def __run_xray(self):
         """
@@ -174,7 +169,12 @@ class XrayNode(object):
         """
         self.__prepare()
         self.loop.create_task(self.__run_xray())
-        self.__run_loop()
+        try:
+            self.loop.run_forever()
+        finally:
+            self.loop.close()
+            p = psutil.Process(pid=os.getpid())
+            p.terminate()
 
 
 @click.group()

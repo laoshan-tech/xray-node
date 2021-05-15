@@ -30,7 +30,6 @@ from xray_node.utils.consts import NETWORK_DICT
 from xray_node.utils.install import XrayFile
 
 logger = logging.getLogger(__name__)
-cfg_cls = Config()
 
 
 def to_typed_message(message: _message):
@@ -148,7 +147,9 @@ class Xray(object):
     def __init__(self, xray_f: XrayFile):
         self.xray_f = xray_f
         self.xray_proc: Union[None, psutil.Process] = None
-        self.xray_client = grpc.insecure_channel(target=f"{cfg_cls.local_api_host}:{cfg_cls.local_api_port}")
+
+        self.config = Config(cfg=self.xray_f.xn_cfg_fn)
+        self.xray_client = grpc.insecure_channel(target=f"{self.config.local_api_host}:{self.config.local_api_port}")
 
     async def get_user_upload_traffic(self, email: str, reset: bool = False) -> Union[int, None]:
         """
@@ -354,7 +355,7 @@ class Xray(object):
             ("01_api.json", cfg.API_CFG),
             ("02_policy.json", cfg.POLICY_CFG),
             ("03_routing.json", cfg.ROUTING_CFG),
-            ("04_inbounds.json", cfg.INBOUNDS_CFG),
+            ("04_inbounds.json", cfg.get_inbound_cfg(cfg_cls=self.config)),
             ("05_outbounds.json", cfg.OUTBOUNDS_CFG),
         ]
 
@@ -398,7 +399,7 @@ class Xray(object):
         停止xray-core
         :return:
         """
-        if self.xray_proc:
+        if self.xray_proc and await self.is_running():
             self.xray_proc.terminate()
         else:
             return

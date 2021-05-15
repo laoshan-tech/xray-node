@@ -1,7 +1,5 @@
 from xray_node.config import Config
 
-cfg_cls = Config()
-
 BASE_CFG = {"log": {}, "api": {}, "dns": {}, "stats": {}, "policy": {}, "transport": {}, "routing": {}, "inbounds": []}
 
 API_CFG = {"api": {"tag": "api", "services": ["HandlerService", "LoggerService", "StatsService"]}}
@@ -30,16 +28,19 @@ ROUTING_CFG = {
     },
 }
 
-INBOUNDS_CFG = {
-    "inbounds": [
-        {
-            "listen": cfg_cls.local_api_host,
-            "port": cfg_cls.local_api_port,
-            "protocol": "dokodemo-door",
-            "settings": {"address": cfg_cls.local_api_host},
-            "tag": "api",
-        },
-    ]
-}
+
+def get_inbound_cfg(cfg_cls: Config):
+    return {
+        "inbounds": [
+            {
+                "listen": cfg_cls.local_api_host,
+                "port": cfg_cls.local_api_port,
+                "protocol": "dokodemo-door",
+                "settings": {"address": cfg_cls.local_api_host},
+                "tag": "api",
+            },
+        ]
+    }
+
 
 OUTBOUNDS_CFG = {"outbounds": [{"protocol": "freedom"}]}
