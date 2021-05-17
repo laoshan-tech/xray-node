@@ -87,7 +87,7 @@ class User(Model):
         cls.get_or_create(user_id=data.user_id)
 
     @classmethod
-    @atomic
+    @atomic()
     async def create_or_update_from_data_list(
         cls,
         user_data_list: List[Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]],

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import signal
 from pathlib import Path
 
 import click
@@ -80,10 +79,6 @@ class XrayNode(object):
 
         self.xray = Xray(xray_f=self.xray_f)
 
-        signals = (signal.SIGTERM, signal.SIGINT)
-        for s in signals:
-            self.loop.add_signal_handler(s, lambda s=s: asyncio.create_task(self.__cleanup()))
-
         self.__prepared = True
 
     async def __cleanup(self) -> None:
@@ -99,7 +94,6 @@ class XrayNode(object):
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         [task.cancel() for task in tasks]
         await asyncio.gather(*tasks, return_exceptions=True)
-        self.loop.stop()
 
     async def __sync_user_from_local(self):
         """
@@ -171,7 +165,11 @@ class XrayNode(object):
         self.loop.create_task(self.__run_xray())
         try:
             self.loop.run_forever()
+        except KeyboardInterrupt:
+            self.loop.run_until_complete(self.__cleanup())
+            logger.info("正在退出......")
         finally:
+            self.loop.stop()
             self.loop.close()
             p = psutil.Process(pid=os.getpid())
             p.terminate()
