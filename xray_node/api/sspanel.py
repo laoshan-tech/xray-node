@@ -95,7 +95,7 @@ class SSPanelAPI(BaseAPI):
                 conn_port, listen_port = value.split("#", maxsplit=1)
 
         node = entities.SSNode(
-            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port), method="none"
+            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port)
         )
         return node
 
@@ -233,6 +233,7 @@ class SSPanelAPI(BaseAPI):
             user = entities.SSUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
+                node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
                 password=data.get("passwd", ""),
@@ -247,6 +248,7 @@ class SSPanelAPI(BaseAPI):
             user = entities.VMessUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
+                node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
                 uuid=data.get("uuid", ""),
@@ -255,6 +257,7 @@ class SSPanelAPI(BaseAPI):
             user = entities.VLessUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
+                node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
                 uuid=data.get("uuid", ""),
@@ -263,6 +266,7 @@ class SSPanelAPI(BaseAPI):
             user = entities.TrojanUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
+                node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
                 uuid=data.get("uuid", ""),

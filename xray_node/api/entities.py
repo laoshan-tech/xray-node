@@ -1,7 +1,8 @@
 class GenericUser(object):
-    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int):
+    def __init__(self, user_id: int, panel_name: str, node_id: int, email: str, speed_limit: int):
         self.user_id = user_id
         self.panel_name = panel_name
+        self.node_id = node_id
         self.email = email
         self.speed_limit = speed_limit
 
@@ -11,6 +12,7 @@ class SSUser(GenericUser):
         self,
         user_id: int,
         panel_name: str,
+        node_id: int,
         email: str,
         speed_limit: int,
         password: str,
@@ -18,7 +20,9 @@ class SSUser(GenericUser):
         is_multi_user: bool = False,
         listen_port: int = 0,
     ):
-        super(SSUser, self).__init__(user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit)
+        super(SSUser, self).__init__(
+            user_id=user_id, panel_name=panel_name, node_id=node_id, email=email, speed_limit=speed_limit
+        )
         self.method = method
         self.password = password
         self.is_multi_user = is_multi_user
@@ -26,22 +30,24 @@ class SSUser(GenericUser):
 
 
 class VMessUser(GenericUser):
-    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
-        super(VMessUser, self).__init__(user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit)
+    def __init__(self, user_id: int, panel_name: str, node_id: int, email: str, speed_limit: int, uuid: str):
+        super(VMessUser, self).__init__(
+            user_id=user_id, panel_name=panel_name, node_id=node_id, email=email, speed_limit=speed_limit
+        )
         self.uuid = uuid
 
 
 class VLessUser(VMessUser):
-    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
+    def __init__(self, user_id: int, panel_name: str, node_id: int, email: str, speed_limit: int, uuid: str):
         super(VLessUser, self).__init__(
-            user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit, uuid=uuid
+            user_id=user_id, panel_name=panel_name, node_id=node_id, email=email, speed_limit=speed_limit, uuid=uuid
         )
 
 
 class TrojanUser(VMessUser):
-    def __init__(self, user_id: int, panel_name: str, email: str, speed_limit: int, uuid: str):
+    def __init__(self, user_id: int, panel_name: str, node_id: int, email: str, speed_limit: int, uuid: str):
         super(TrojanUser, self).__init__(
-            user_id=user_id, panel_name=panel_name, email=email, speed_limit=speed_limit, uuid=uuid
+            user_id=user_id, panel_name=panel_name, node_id=node_id, email=email, speed_limit=speed_limit, uuid=uuid
         )
 
 
@@ -54,9 +60,10 @@ class GenericNode(object):
 
 
 class SSNode(GenericNode):
-    def __init__(self, node_id: int, panel_name: str, listen_port: int, method: str):
-        super(SSNode, self).__init__(node_id=node_id, panel_name=panel_name, listen_port=listen_port)
-        self.method = method
+    def __init__(self, node_id: int, panel_name: str, listen_port: int, listen_host: str = "0.0.0.0"):
+        super(SSNode, self).__init__(
+            node_id=node_id, panel_name=panel_name, listen_port=listen_port, listen_host=listen_host
+        )
 
 
 class VMessNode(GenericNode):

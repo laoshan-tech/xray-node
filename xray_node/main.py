@@ -100,7 +100,9 @@ class XrayNode(object):
         本地模式同步用户
         :return:
         """
+        nodes = self.config.load_local_nodes()
         users = self.config.load_local_users()
+        await models.Node.create_or_update_from_data_list(node_data_list=nodes)
         await models.User.create_or_update_from_data_list(user_data_list=users)
 
     async def __sync_user_from_remote(self):

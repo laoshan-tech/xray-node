@@ -13,9 +13,19 @@ class DataError(Exception):
         self.msg = msg
 
 
+class UnsupportedNode(DataError):
+    def __init__(self, msg):
+        super(UnsupportedNode, self).__init__(msg=msg)
+
+
 class UnsupportedUser(DataError):
     def __init__(self, msg):
         super(UnsupportedUser, self).__init__(msg=msg)
+
+
+class NodeDataNotFound(DataError):
+    def __init__(self, msg):
+        super(NodeDataNotFound, self).__init__(msg=msg)
 
 
 class EmailExistsError(XrayError):

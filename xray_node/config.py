@@ -62,6 +62,17 @@ port = 10085
 listen = "0.0.0.0"
 port = 1234
 protocol = "shadowsocks"
+
+[[xray.inbounds]]
+listen = "0.0.0.0"
+port = 2345
+protocol = "vmess"
+transport = "ws"
+alter_id = 64
+path = "/ws"
+host = "a.com"
+enable_tls = true
+tls_type = "xtls"
 """
     target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     with open(target, "w", encoding="utf-8") as f:
@@ -106,6 +117,72 @@ class Config(object):
                     Config._instance = super(Config, cls).__new__(cls, *args, **kwargs)
         return Config._instance
 
+    def load_local_nodes(
+        self,
+    ) -> List[Union[entities.SSNode, entities.VMessNode, entities.VLessNode, entities.TrojanNode]]:
+        """
+        通过配置文件加载节点信息
+        :return:
+        """
+        nodes = []
+        for idx, inbound in enumerate(self.inbounds):
+            panel_name = f"local"
+            listen_host = inbound.get("listen", "0.0.0.0")
+            alter_id = inbound.get("alter_id", 16)
+            try:
+                if inbound["protocol"] in (NodeTypeEnum.Shadowsocks.value, NodeTypeEnum.ShadowsocksR.value):
+                    n = entities.SSNode(
+                        node_id=idx,
+                        panel_name=panel_name,
+                        listen_port=inbound["port"],
+                        listen_host=listen_host,
+                    )
+                    nodes.append(n)
+                elif inbound["protocol"] == NodeTypeEnum.VMess.value:
+                    n = entities.VMessNode(
+                        node_id=idx,
+                        panel_name=panel_name,
+                        listen_port=inbound["port"],
+                        listen_host=listen_host,
+                        alter_id=alter_id,
+                        transport=inbound["transport"],
+                        enable_tls=inbound["enable_tls"],
+                        tls_type=inbound["tls_type"],
+                        path=inbound.get("path", "/ws"),
+                        host=inbound["host"],
+                    )
+                    nodes.append(n)
+                elif inbound["protocol"] == NodeTypeEnum.VLess.value:
+                    n = entities.VMessNode(
+                        node_id=idx,
+                        panel_name=panel_name,
+                        listen_port=inbound["port"],
+                        listen_host=listen_host,
+                        alter_id=alter_id,
+                        transport=inbound["transport"],
+                        enable_tls=inbound["enable_tls"],
+                        tls_type=inbound["tls_type"],
+                        path=inbound.get("path", "/ws"),
+                        host=inbound["host"],
+                    )
+                    nodes.append(n)
+                elif inbound["protocol"] == NodeTypeEnum.Trojan.value:
+                    n = entities.TrojanNode(
+                        node_id=idx,
+                        panel_name=panel_name,
+                        listen_port=inbound["port"],
+                        listen_host=listen_host,
+                        enable_xtls=inbound["enable_xtls"],
+                        enable_vless=inbound["enable_vless"],
+                        host=inbound["host"],
+                    )
+                    nodes.append(n)
+            except KeyError as e:
+                logger.error(f"从配置文件中加载节点时出错 {e}")
+                continue
+
+        return nodes
+
     def load_local_users(
         self,
     ) -> List[Union[entities.SSUser, entities.VMessUser, entities.VLessUser, entities.TrojanUser]]:
@@ -122,6 +199,7 @@ class Config(object):
                     u = entities.SSUser(
                         user_id=idx,
                         panel_name="local",
+                        node_id=0,
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         password=c["password"],
@@ -132,6 +210,7 @@ class Config(object):
                     u = entities.VMessUser(
                         user_id=idx,
                         panel_name="local",
+                        node_id=0,
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],
@@ -141,6 +220,7 @@ class Config(object):
                     u = entities.VLessUser(
                         user_id=idx,
                         panel_name="local",
+                        node_id=0,
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],
@@ -150,6 +230,7 @@ class Config(object):
                     u = entities.TrojanUser(
                         user_id=idx,
                         panel_name="local",
+                        node_id=0,
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],
