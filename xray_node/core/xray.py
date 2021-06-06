@@ -345,6 +345,13 @@ class Xray(object):
             else:
                 raise XrayError(detail)
 
+    async def sync_data_from_db(self):
+        """
+        从数据库同步节点与用户数据
+        :return:
+        """
+        pass
+
     async def gen_cfg(self) -> None:
         """
         生成基础配置文件

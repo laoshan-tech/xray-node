@@ -109,7 +109,6 @@ class User(Model):
             logger.info(f"User表内无数据，全量插入")
             new_users = [await cls._gen_obj_from_user(u=u) for u in user_data_list]
             await cls.bulk_create(objects=new_users)
-            logger.info(await User.all().values())
         else:
             db_user_dict = {
                 f"{u.node.panel_name}-{u.user_id}": u

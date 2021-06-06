@@ -95,7 +95,10 @@ class SSPanelAPI(BaseAPI):
                 conn_port, listen_port = value.split("#", maxsplit=1)
 
         node = entities.SSNode(
-            node_id=self.node_id, panel_name=urlparse(self.endpoint).netloc, listen_port=int(listen_port)
+            node_id=self.node_id,
+            panel_name=urlparse(self.endpoint).netloc,
+            listen_port=int(listen_port),
+            listen_host="0.0.0.0",
         )
         return node
 
@@ -141,6 +144,7 @@ class SSPanelAPI(BaseAPI):
                 node_id=self.node_id,
                 panel_name=urlparse(self.endpoint).netloc,
                 listen_port=int(port),
+                listen_host="0.0.0.0",
                 alter_id=alter_id,
                 transport=transport,
                 enable_tls=enable_tls,
@@ -153,6 +157,7 @@ class SSPanelAPI(BaseAPI):
                 node_id=self.node_id,
                 panel_name=urlparse(self.endpoint).netloc,
                 listen_port=int(port),
+                listen_host="0.0.0.0",
                 alter_id=alter_id,
                 transport=transport,
                 enable_tls=enable_tls,
@@ -193,6 +198,7 @@ class SSPanelAPI(BaseAPI):
             node_id=self.node_id,
             panel_name=urlparse(self.endpoint).netloc,
             listen_port=int(listen_port),
+            listen_host="0.0.0.0",
             host=host,
             enable_xtls=enable_xtls,
             enable_vless=enable_vless,
