@@ -26,25 +26,23 @@ class TestXray(object):
 
     @pytest.mark.asyncio
     async def test_add_inbound(self):
-        vmess_proto = VMessInbound(email=self.email, level=0, alter_id=64, user_id=str(uuid.uuid4()))
+        vmess_proto = VMessInbound()
         await self.xray.add_inbound(
             inbound_tag="vmess_test", address=self.host, port=self.vmess_p, protocol=vmess_proto
         )
         assert await check_port_alive(host=self.host, port=self.vmess_p) is True
 
-        vless_proto = VLESSInbound(email=self.email, level=0, flow="", user_id=str(uuid.uuid4()))
+        vless_proto = VLESSInbound()
         await self.xray.add_inbound(
             inbound_tag="vless_test", address=self.host, port=self.vless_p, protocol=vless_proto
         )
         assert await check_port_alive(host=self.host, port=self.vless_p) is True
 
-        ss_proto = ShadowsocksInbound(
-            email=self.email, level=0, password="test", cipher_type=CIPHER_TYPE_DICT["aes-256-gcm"]
-        )
+        ss_proto = ShadowsocksInbound()
         await self.xray.add_inbound(inbound_tag="ss_test", address=self.host, port=self.ss_p, protocol=ss_proto)
         assert await check_port_alive(host=self.host, port=self.ss_p) is True
 
-        trojan_proto = TrojanInbound(email=self.email, level=0, password="test", flow="")
+        trojan_proto = TrojanInbound()
         await self.xray.add_inbound(
             inbound_tag="trojan_test", address=self.host, port=self.trojan_p, protocol=trojan_proto
         )

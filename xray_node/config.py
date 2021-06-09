@@ -35,35 +35,41 @@ api_key = "key"
 type = "shadowsocks"
 password = "aabbccdd"
 speed_limit = 0
-cipher_type = "aes-256-gcm"
+method = "aes-256-gcm"
+node_id = 1
 
 [[user.clients]]
 type = "shadowsocks"
 password = "aabbccdd"
 speed_limit = 0
-cipher_type = "aes-256-gcm"
+method = "aes-256-gcm"
+node_id = 1
 
 [[user.clients]]
 type = "shadowsocks"
 password = "aabbccdd"
 speed_limit = 0
-cipher_type = "aes-256-gcm"
+method = "aes-256-gcm"
+node_id = 1
 
 [[user.clients]]
 type = "vmess"
 uuid = "595abb61-be40-4cee-afb4-d889dcd510cb"
 speed_limit = 0
+node_id = 2
 
 [xray.api]
 host = "127.0.0.1"
 port = 10085
 
 [[xray.inbounds]]
+node_id = 1
 listen = "0.0.0.0"
 port = 1234
 protocol = "shadowsocks"
 
 [[xray.inbounds]]
+node_id = 2
 listen = "0.0.0.0"
 port = 2345
 protocol = "vmess"
@@ -110,6 +116,8 @@ class Config(object):
         self.local_api_host = self.content["xray"]["api"]["host"]
         self.local_api_port = self.content["xray"]["api"]["port"]
 
+        self.ss_cipher_type_set = set()
+
     def __new__(cls, cfg: Path = None, *args, **kwargs):
         if not hasattr(Config, "_instance"):
             with Config._instance_lock:
@@ -132,7 +140,7 @@ class Config(object):
             try:
                 if inbound["protocol"] in (NodeTypeEnum.Shadowsocks.value, NodeTypeEnum.ShadowsocksR.value):
                     n = entities.SSNode(
-                        node_id=idx,
+                        node_id=inbound.get("node_id", idx),
                         panel_name=panel_name,
                         listen_port=inbound["port"],
                         listen_host=listen_host,
@@ -140,7 +148,7 @@ class Config(object):
                     nodes.append(n)
                 elif inbound["protocol"] == NodeTypeEnum.VMess.value:
                     n = entities.VMessNode(
-                        node_id=idx,
+                        node_id=inbound.get("node_id", idx),
                         panel_name=panel_name,
                         listen_port=inbound["port"],
                         listen_host=listen_host,
@@ -154,7 +162,7 @@ class Config(object):
                     nodes.append(n)
                 elif inbound["protocol"] == NodeTypeEnum.VLess.value:
                     n = entities.VMessNode(
-                        node_id=idx,
+                        node_id=inbound.get("node_id", idx),
                         panel_name=panel_name,
                         listen_port=inbound["port"],
                         listen_host=listen_host,
@@ -168,7 +176,7 @@ class Config(object):
                     nodes.append(n)
                 elif inbound["protocol"] == NodeTypeEnum.Trojan.value:
                     n = entities.TrojanNode(
-                        node_id=idx,
+                        node_id=inbound.get("node_id", idx),
                         panel_name=panel_name,
                         listen_port=inbound["port"],
                         listen_host=listen_host,
@@ -199,18 +207,19 @@ class Config(object):
                     u = entities.SSUser(
                         user_id=idx,
                         panel_name="local",
-                        node_id=0,
+                        node_id=c.get("node_id", idx),
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         password=c["password"],
-                        method=c["cipher_type"],
+                        method=c["method"],
                     )
+                    self.ss_cipher_type_set.add(c["method"])
                     users.append(u)
                 elif c["type"] == NodeTypeEnum.VMess.value:
                     u = entities.VMessUser(
                         user_id=idx,
                         panel_name="local",
-                        node_id=0,
+                        node_id=c.get("node_id", idx),
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],
@@ -220,7 +229,7 @@ class Config(object):
                     u = entities.VLessUser(
                         user_id=idx,
                         panel_name="local",
-                        node_id=0,
+                        node_id=c.get("node_id", idx),
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],
@@ -230,7 +239,7 @@ class Config(object):
                     u = entities.TrojanUser(
                         user_id=idx,
                         panel_name="local",
-                        node_id=0,
+                        node_id=c.get("node_id", idx),
                         email=f"{idx}@local",
                         speed_limit=c.get("speed_limit", 0),
                         uuid=c["uuid"],

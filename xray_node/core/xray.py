@@ -25,8 +25,15 @@ from xray_rpc.proxy.vmess.inbound import config_pb2 as vmess_inbound_config_pb2
 
 from xray_node.config import Config
 from xray_node.core import cfg
-from xray_node.exceptions import EmailExistsError, InboundTagNotFound, XrayError, AddressAlreadyInUseError
-from xray_node.utils.consts import NETWORK_DICT
+from xray_node.exceptions import (
+    EmailExistsError,
+    InboundTagNotFound,
+    XrayError,
+    AddressAlreadyInUseError,
+    InboundTagAlreadyExists,
+)
+from xray_node.mdb import models
+from xray_node.utils.consts import NETWORK_DICT, NodeTypeEnum, CIPHER_TYPE_DICT
 from xray_node.utils.install import XrayFile
 
 logger = logging.getLogger(__name__)
@@ -46,47 +53,23 @@ class Protocol(object):
 
 
 class VMessInbound(Protocol):
-    def __init__(self, email: str, level: int, alter_id: int, user_id: str):
+    def __init__(self):
         """
         VMess
-        :param email: 邮箱
-        :param level: 等级
-        :param alter_id:
-        :param user_id: UUID
         """
         super(VMessInbound, self).__init__()
-        self.message = to_typed_message(
-            vmess_inbound_config_pb2.Config(
-                user=[
-                    user_pb2.User(
-                        email=email,
-                        level=level,
-                        account=to_typed_message(vmess_account_pb2.Account(id=user_id, alter_id=alter_id)),
-                    )
-                ]
-            )
-        )
+        self.message = to_typed_message(vmess_inbound_config_pb2.Config(user=[]))
 
 
 class VLESSInbound(Protocol):
-    def __init__(self, email: str, level: int, flow: int, user_id: str):
+    def __init__(self):
         """
         VLESS
-        :param email: 邮箱
-        :param level: 等级
-        :param flow: flow 如 xtls-rprx-direct
-        :param user_id: UUID
         """
         super(VLESSInbound, self).__init__()
         self.message = to_typed_message(
             vless_inbound_config_pb2.Config(
-                clients=[
-                    user_pb2.User(
-                        email=email,
-                        level=level,
-                        account=to_typed_message(vless_account_pb2.Account(id=user_id, flow=flow)),
-                    )
-                ],
+                clients=[],
                 decryption="",
                 fallbacks=[],
             )
@@ -94,50 +77,28 @@ class VLESSInbound(Protocol):
 
 
 class ShadowsocksInbound(Protocol):
-    def __init__(self, email: str, level: int, password: str, cipher_type: int):
+    def __init__(self):
         """
         Shadowsocks
-        :param email: 邮箱
-        :param level: 等级
-        :param password: 密码
-        :param cipher_type: 加密方式
         """
         super(ShadowsocksInbound, self).__init__()
         self.message = to_typed_message(
             shadowsocks_config_pb2.ServerConfig(
-                users=[
-                    user_pb2.User(
-                        email=email,
-                        level=level,
-                        account=to_typed_message(
-                            shadowsocks_config_pb2.Account(password=password, cipher_type=cipher_type)
-                        ),
-                    )
-                ],
+                users=[],
                 network=[NETWORK_DICT["tcp"], NETWORK_DICT["udp"]],
             )
         )
 
 
 class TrojanInbound(Protocol):
-    def __init__(self, email: str, level: int, password: str, flow: str):
+    def __init__(self):
         """
         Trojan
-        :param email: 邮箱
-        :param level: 等级
-        :param password: 密码
-        :param flow: 流控
         """
         super(TrojanInbound, self).__init__()
         self.message = to_typed_message(
             trojan_config_pb2.ServerConfig(
-                users=[
-                    user_pb2.User(
-                        email=email,
-                        level=level,
-                        account=to_typed_message(trojan_config_pb2.Account(password=password, flow=flow)),
-                    )
-                ],
+                users=[],
                 fallbacks=[],
             )
         )
@@ -213,37 +174,57 @@ class Xray(object):
         except grpc.RpcError:
             return None
 
-    async def add_user(self, inbound_tag: str, user_id: int, email: str, level: int, type: str, alter_id: str):
+    async def add_user(
+        self,
+        inbound_tag: str,
+        email: str,
+        level: int,
+        type: str,
+        password: str = "",
+        cipher_type: int = 0,
+        uuid: str = "",
+        alter_id: int = 0,
+    ):
         """
         在一个传入连接中添加一个用户
         :param inbound_tag:
-        :param user_id:
         :param email:
         :param level:
         :param type:
+        :param password:
+        :param cipher_type:
+        :param uuid:
         :param alter_id:
         :return:
         """
         stub = proxyman_command_pb2_grpc.HandlerServiceStub(self.xray_client)
         try:
-            if type == "vmess":
+            if type == NodeTypeEnum.VMess.value:
                 user = user_pb2.User(
                     email=email,
                     level=level,
-                    account=to_typed_message(vmess_account_pb2.Account(id=user_id, alter_id=alter_id)),
+                    account=to_typed_message(vmess_account_pb2.Account(id=uuid, alter_id=alter_id)),
                 )
-            elif type == "vless":
+            elif type == NodeTypeEnum.VLess.value:
                 user = user_pb2.User(
                     email=email,
                     level=level,
-                    account=to_typed_message(vless_account_pb2.Account(id=user_id, alter_id=alter_id)),
+                    account=to_typed_message(vless_account_pb2.Account(id=uuid, alter_id=alter_id)),
                 )
-            elif type == "shadowsocks":
+            elif type == NodeTypeEnum.Shadowsocks.value:
                 user = user_pb2.User(
-                    email=email, level=level, account=to_typed_message(shadowsocks_config_pb2.Account())
+                    email=email,
+                    level=level,
+                    account=to_typed_message(
+                        shadowsocks_config_pb2.Account(password=password, cipher_type=cipher_type)
+                    ),
                 )
-            elif type == "trojan":
-                user = user_pb2.User(email=email, level=level, account=to_typed_message(trojan_config_pb2.Account()))
+            elif type == NodeTypeEnum.Trojan.value:
+                user = user_pb2.User(
+                    email=email,
+                    level=level,
+                    account=to_typed_message(trojan_config_pb2.Account(password=password, flow="xtls-rprx-direct")),
+                )
             else:
                 raise XrayError(f"不支持的传入连接类型 {type}")
 
@@ -253,7 +234,6 @@ class Xray(object):
                     operation=to_typed_message(proxyman_command_pb2.AddUserOperation(user=user)),
                 )
             )
-            return user_id
         except grpc.RpcError as rpc_err:
             detail = rpc_err.details()
             if detail.endswith(f"User {email} already exists."):
@@ -296,7 +276,6 @@ class Xray(object):
         """
         stub = proxyman_command_pb2_grpc.HandlerServiceStub(self.xray_client)
         try:
-            logger.error(stub)
             resp = stub.AddInbound(
                 proxyman_command_pb2.AddInboundRequest(
                     inbound=core_config_pb2.InboundHandlerConfig(
@@ -321,11 +300,12 @@ class Xray(object):
                     )
                 )
             )
-            logger.error(resp)
         except grpc.RpcError as rpc_err:
             detail = rpc_err.details()
             if detail.endswith("address already in use"):
                 raise AddressAlreadyInUseError(detail, port)
+            elif detail.endswith(f"existing tag found: {inbound_tag}"):
+                raise InboundTagAlreadyExists(detail, inbound_tag)
             else:
                 raise XrayError(detail)
 
@@ -350,7 +330,55 @@ class Xray(object):
         从数据库同步节点与用户数据
         :return:
         """
-        pass
+        active_nodes = await models.Node.filter_active_nodes()
+        for n in active_nodes:
+            proto = Protocol()
+            if n.type == NodeTypeEnum.Shadowsocks.value:
+                proto = ShadowsocksInbound()
+            elif n.type == NodeTypeEnum.VMess.value:
+                proto = VMessInbound()
+            elif n.type == NodeTypeEnum.VLess.value:
+                proto = VLESSInbound()
+            elif n.type == NodeTypeEnum.Trojan.value:
+                proto = TrojanInbound()
+
+            try:
+                await self.add_inbound(
+                    inbound_tag=n.inbound_tag, address=n.listen_host, port=n.listen_port, protocol=proto
+                )
+                logger.info(f"添加入向代理 {n.inbound_tag} 成功")
+            except InboundTagAlreadyExists as e:
+                logger.info(f"入向代理 {e.inbound_tag} 已存在，跳过")
+
+        deleted_nodes = await models.Node.filter_deleted_nodes()
+        for n in deleted_nodes:
+            try:
+                await self.remove_inbound(inbound_tag=n.inbound_tag)
+                logger.info(f"删除入向代理 {n.inbound_tag} 成功")
+            except InboundTagNotFound as e:
+                logger.info(f"入向代理不存在 {e.inbound_tag}，跳过")
+
+        active_users = await models.User.filter_active_users()
+        for u in active_users:
+            try:
+                if u.node.cipher_type != "unknown":
+                    method = CIPHER_TYPE_DICT.get(u.node.cipher_type, 0)
+                else:
+                    method = CIPHER_TYPE_DICT.get(u.method, 0)
+
+                await self.add_user(
+                    inbound_tag=u.node.inbound_tag,
+                    email=u.email,
+                    level=0,
+                    type=u.node.type,
+                    password=u.password,
+                    cipher_type=method,
+                    uuid=u.uuid,
+                    alter_id=u.node.alter_id,
+                )
+                logger.info(f"添加用户 {u} 成功")
+            except XrayError as e:
+                logger.exception(f"添加用户 {u} 出错 {e.detail}")
 
     async def gen_cfg(self) -> None:
         """

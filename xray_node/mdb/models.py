@@ -121,15 +121,33 @@ class User(Model):
                 old_db_user = db_user_dict.get(f"{user_data.panel_name}-{user_data.user_id}")
                 if (
                     not old_db_user
-                    or old_db_user.port != user_data.listen_port
-                    or old_db_user.password != user_data.password
-                    or old_db_user.method != user_data.method
-                    or old_db_user.uuid != user_data.uuid
+                    or (hasattr(user_data, "listen_port") and old_db_user.port != user_data.listen_port)
+                    or (hasattr(user_data, "password") and old_db_user.password != user_data.password)
+                    or (hasattr(user_data, "method") and old_db_user.method != user_data.method)
+                    or (hasattr(user_data, "uuid") and old_db_user.uuid != user_data.uuid)
                 ):
                     need_update_or_create_users.append(user_data)
 
             for u in need_update_or_create_users:
                 cls._create_or_update_from_data(data=u)
+
+    @classmethod
+    async def filter_active_users(cls) -> List[User]:
+        """
+        返回生效的用户数据
+        :return:
+        """
+        active_users = await User.filter(is_deleted=False).select_related("node").all()
+        return active_users
+
+    @classmethod
+    async def filter_deleted_users(cls) -> List[User]:
+        """
+        返回删除的用户数据
+        :return:
+        """
+        deleted_users = await User.filter(is_deleted=True).prefetch_related().all()
+        return deleted_users
 
 
 class Node(Model):
@@ -156,6 +174,10 @@ class Node(Model):
     def __str__(self):
         return f"Node-{self.panel_name}-{self.node_id}"
 
+    @property
+    def inbound_tag(self):
+        return f"{self.panel_name}-{self.node_id}-{self.type}-{self.listen_port}"
+
     @classmethod
     async def _gen_obj_from_node(
         cls, n: Union[entities.SSNode, entities.VMessNode, entities.VLessNode, entities.TrojanNode]
@@ -172,7 +194,7 @@ class Node(Model):
                 type=NodeTypeEnum.Shadowsocks.value,
                 tag=f"{n.panel_name}-{NodeTypeEnum.Shadowsocks.value}-{n.node_id}",
                 protocol=NodeTypeEnum.Shadowsocks.value,
-                cipher_type="",
+                cipher_type=n.method,
                 listen_host=n.listen_host,
                 listen_port=n.listen_port,
                 host="",
@@ -272,3 +294,21 @@ class Node(Model):
 
             for u in need_update_or_create_nodes:
                 cls._create_or_update_from_data(data=u)
+
+    @classmethod
+    async def filter_active_nodes(cls) -> List[Node]:
+        """
+        返回生效的节点数据
+        :return:
+        """
+        active_nodes = await Node.filter(is_deleted=False).all()
+        return active_nodes
+
+    @classmethod
+    async def filter_deleted_nodes(cls) -> List[Node]:
+        """
+        返回删除的节点数据
+        :return:
+        """
+        deleted_nodes = await Node.filter(is_deleted=True).all()
+        return deleted_nodes

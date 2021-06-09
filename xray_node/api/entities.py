@@ -43,7 +43,7 @@ class GenericNode(object):
 
 @dataclass
 class SSNode(GenericNode):
-    pass
+    method: str = "unknown"
 
 
 @dataclass

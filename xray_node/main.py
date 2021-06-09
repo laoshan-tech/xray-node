@@ -130,6 +130,8 @@ class XrayNode(object):
                 logger.info(f"使用远程服务加载用户信息")
                 await self.__sync_user_from_remote()
 
+            await self.xray.sync_data_from_db()
+
             await asyncio.sleep(60)
 
     async def __run_xray(self):
