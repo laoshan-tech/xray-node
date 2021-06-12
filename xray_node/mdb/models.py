@@ -42,6 +42,7 @@ class User(Model):
     port = fields.IntField(description="端口", default=0, index=True)
     method = fields.CharField(description="加密方法", default="", max_length=64)
     password = fields.CharField(description="密码", default="", max_length=128)
+    flow = fields.CharField(description="Xray流控策略", default="", max_length=64)
     upload_traffic = fields.BigIntField(description="上传流量", default=0)
     download_traffic = fields.BigIntField(description="下载流量", default=0)
     total_traffic = fields.BigIntField(description="总流量", default=0)
@@ -50,7 +51,7 @@ class User(Model):
     is_deleted = fields.BooleanField(description="是否删除", default=False, index=True)
 
     def __str__(self):
-        return f"User-{self.node}-{self.email}"
+        return f"User-{self.user_id}-{self.email}"
 
     @classmethod
     async def _gen_obj_from_user(
@@ -75,8 +76,10 @@ class User(Model):
                 method=u.method,
                 password=u.password,
             )
-        elif isinstance(u, (entities.VMessUser, entities.VLessUser, entities.TrojanUser)):
+        elif isinstance(u, (entities.VMessUser, entities.VLessUser)):
             user_obj = cls(node=node_obj, user_id=u.user_id, email=u.email, uuid=u.uuid)
+        elif isinstance(u, entities.TrojanUser):
+            user_obj = cls(node=node_obj, user_id=u.user_id, email=u.email, uuid=u.uuid, flow=u.flow)
         else:
             raise UnsupportedUser(msg=f"{type(u).__name__}")
 
@@ -149,6 +152,26 @@ class User(Model):
         deleted_users = await User.filter(is_deleted=True).prefetch_related().all()
         return deleted_users
 
+    @classmethod
+    async def prune_users(cls) -> None:
+        """
+        清理无用用户数据
+        :return:
+        """
+        await User.filter(is_deleted=True).delete()
+
+    async def sync_user_traffic(self, upload: int, download: int):
+        """
+        从Xray同步用户数据流量
+        :param upload:
+        :param download:
+        :return:
+        """
+        self.upload_traffic += upload
+        self.download_traffic += download
+        self.total_traffic += upload + download
+        await self.save()
+
 
 class Node(Model):
     id = fields.BigIntField(pk=True)
@@ -172,7 +195,7 @@ class Node(Model):
     is_deleted = fields.BooleanField(description="是否删除", default=False, index=True)
 
     def __str__(self):
-        return f"Node-{self.panel_name}-{self.node_id}"
+        return f"Node-{self.panel_name}-{self.node_id}-{self.type}"
 
     @property
     def inbound_tag(self):
@@ -312,3 +335,11 @@ class Node(Model):
         """
         deleted_nodes = await Node.filter(is_deleted=True).all()
         return deleted_nodes
+
+    @classmethod
+    async def prune_nodes(cls) -> None:
+        """
+        清理无用节点数据
+        :return:
+        """
+        await Node.filter(is_deleted=True).delete()

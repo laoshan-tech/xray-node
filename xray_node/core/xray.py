@@ -125,8 +125,13 @@ class Xray(object):
                 stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>uplink", reset=reset)
             )
             return resp.stat.value
-        except grpc.RpcError:
-            return None
+        except grpc.RpcError as rpc_err:
+            detail = rpc_err.details()
+            if detail.endswith("uplink not found."):
+                logger.debug(f"{email} 未找到，可能是不存在或是未使用")
+                return 0
+            else:
+                raise XrayError(detail)
 
     async def get_user_download_traffic(self, email: str, reset: bool = False) -> Union[int, None]:
         """
@@ -141,8 +146,13 @@ class Xray(object):
                 stats_command_pb2.GetStatsRequest(name=f"user>>>{email}>>>traffic>>>downlink", reset=reset)
             )
             return resp.stat.value
-        except grpc.RpcError:
-            return None
+        except grpc.RpcError as rpc_err:
+            detail = rpc_err.details()
+            if detail.endswith("downlink not found."):
+                logger.debug(f"{email} 未找到，可能是不存在或是未使用")
+                return 0
+            else:
+                raise XrayError(detail)
 
     async def get_inbound_upload_traffic(self, inbound_tag: str, reset: bool = False) -> Union[int, None]:
         """
@@ -156,8 +166,9 @@ class Xray(object):
                 stats_command_pb2.GetStatsRequest(name=f"inbound>>>{inbound_tag}>>>traffic>>>uplink", reset=reset)
             )
             return resp.stat.value
-        except grpc.RpcError:
-            return None
+        except grpc.RpcError as rpc_err:
+            detail = rpc_err.details()
+            raise XrayError(detail)
 
     async def get_inbound_download_traffic(self, inbound_tag: str, reset: bool = False) -> Union[int, None]:
         """
@@ -171,8 +182,9 @@ class Xray(object):
                 stats_command_pb2.GetStatsRequest(name=f"inbound>>>{inbound_tag}>>>traffic>>>downlink", reset=reset)
             )
             return resp.stat.value
-        except grpc.RpcError:
-            return None
+        except grpc.RpcError as rpc_err:
+            detail = rpc_err.details()
+            raise XrayError(detail)
 
     async def add_user(
         self,
@@ -184,6 +196,7 @@ class Xray(object):
         cipher_type: int = 0,
         uuid: str = "",
         alter_id: int = 0,
+        flow: str = "xtls-rprx-direct",
     ):
         """
         在一个传入连接中添加一个用户
@@ -195,6 +208,7 @@ class Xray(object):
         :param cipher_type:
         :param uuid:
         :param alter_id:
+        :param flow:
         :return:
         """
         stub = proxyman_command_pb2_grpc.HandlerServiceStub(self.xray_client)
@@ -223,7 +237,7 @@ class Xray(object):
                 user = user_pb2.User(
                     email=email,
                     level=level,
-                    account=to_typed_message(trojan_config_pb2.Account(password=password, flow="xtls-rprx-direct")),
+                    account=to_typed_message(trojan_config_pb2.Account(password=password, flow=flow)),
                 )
             else:
                 raise XrayError(f"不支持的传入连接类型 {type}")
@@ -349,6 +363,9 @@ class Xray(object):
                 logger.info(f"添加入向代理 {n.inbound_tag} 成功")
             except InboundTagAlreadyExists as e:
                 logger.info(f"入向代理 {e.inbound_tag} 已存在，跳过")
+            except XrayError as e:
+                logger.exception(f"添加入向代理 {n.inbound_tag} 出错 {e.detail}")
+                continue
 
         deleted_nodes = await models.Node.filter_deleted_nodes()
         for n in deleted_nodes:
@@ -357,6 +374,11 @@ class Xray(object):
                 logger.info(f"删除入向代理 {n.inbound_tag} 成功")
             except InboundTagNotFound as e:
                 logger.info(f"入向代理不存在 {e.inbound_tag}，跳过")
+            except XrayError as e:
+                logger.exception(f"删除入向代理 {n.inbound_tag} 出错 {e.detail}")
+                continue
+
+        await models.Node.prune_nodes()
 
         active_users = await models.User.filter_active_users()
         for u in active_users:
@@ -375,10 +397,29 @@ class Xray(object):
                     cipher_type=method,
                     uuid=u.uuid,
                     alter_id=u.node.alter_id,
+                    flow=u.flow,
                 )
                 logger.info(f"添加用户 {u} 成功")
+            except EmailExistsError as e:
+                logger.info(f"用户 {e.email} 已存在，跳过")
             except XrayError as e:
                 logger.exception(f"添加用户 {u} 出错 {e.detail}")
+
+            try:
+                user_upload = await self.get_user_upload_traffic(email=u.email, reset=True)
+                user_download = await self.get_user_download_traffic(email=u.email, reset=True)
+                await u.sync_user_traffic(upload=user_upload, download=user_download)
+                logger.info(f"同步用户 {u} 流量成功，上行 {user_upload} 下行 {user_download}")
+            except XrayError as e:
+                logger.error(e)
+                continue
+
+        deleted_users = await models.User.filter_deleted_users()
+        for u in deleted_users:
+            try:
+                await self.remove_user(inbound_tag=u.node.inbound_tag, email=u.email)
+            except XrayError as e:
+                logger.exception(f"删除用户 {u} 出错 {e.detail}")
 
     async def gen_cfg(self) -> None:
         """

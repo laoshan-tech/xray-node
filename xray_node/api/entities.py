@@ -30,7 +30,7 @@ class VLessUser(VMessUser):
 
 @dataclass
 class TrojanUser(VMessUser):
-    pass
+    flow: str = "xtls-rprx-direct"
 
 
 @dataclass
