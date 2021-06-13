@@ -1,13 +1,12 @@
 import hashlib
-import logging
 import platform
 import re
 import zipfile
 from pathlib import Path
 
-from xray_node.utils import http, consts
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+from xray_node.utils import http, consts
 
 
 class XrayFile(object):

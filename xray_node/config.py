@@ -1,14 +1,12 @@
-import logging
 import threading
 from pathlib import Path
 from typing import List, Union
 
 import tomlkit
+from loguru import logger
 
 from xray_node.api import entities
 from xray_node.utils.consts import NodeTypeEnum
-
-logger = logging.getLogger(__name__)
 
 
 def init_config(target: Path):

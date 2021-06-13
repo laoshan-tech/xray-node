@@ -58,6 +58,11 @@ class AddressAlreadyInUseError(XrayError):
         self.port = port
 
 
+class APIStatusError(APIError):
+    def __init__(self, msg):
+        super(APIStatusError, self).__init__(msg=msg)
+
+
 class UnsupportedAPI(APIError):
     def __init__(self, msg):
         super(UnsupportedAPI, self).__init__(msg=msg)

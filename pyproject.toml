@@ -27,6 +27,7 @@ click = "^7.1.2"
 tortoise-orm = "^0.17.2"
 pytest-httpserver = "^1.0.0"
 humanize = "^3.7.1"
+loguru = "^0.5.3"
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"

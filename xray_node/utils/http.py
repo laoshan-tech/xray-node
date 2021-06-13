@@ -1,10 +1,9 @@
-import logging
 from pathlib import Path
 
 import httpx
 
 client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=10, connect=15))
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 async def download(url: str, target: Path) -> bool:

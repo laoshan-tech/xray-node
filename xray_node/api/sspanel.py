@@ -1,15 +1,13 @@
-import logging
 import time
 from typing import List, Union
 from urllib.parse import urljoin, urlparse
 
 import psutil
+from loguru import logger
 
 from xray_node.api import BaseAPI, entities
-from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError, ReportUserTrafficError
+from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError, ReportUserTrafficError, APIStatusError
 from xray_node.utils.consts import SSPANEL_NODE_TYPE, NodeTypeEnum
-
-logger = logging.getLogger(__name__)
 
 
 class SSPanelAPI(BaseAPI):
@@ -38,6 +36,8 @@ class SSPanelAPI(BaseAPI):
         self,
     ) -> Union[entities.SSNode, entities.VMessNode, entities.VLessNode, entities.TrojanNode]:
         req = await self.session.get(url=self.fetch_node_info_api, params={"key": self.mu_key})
+        if req.status_code != 200:
+            raise APIStatusError(msg=req.status_code)
         result = req.json()
         ret = result["ret"]
         if ret != 1:
@@ -64,9 +64,11 @@ class SSPanelAPI(BaseAPI):
         :return:
         """
         load = psutil.getloadavg()
-        post_body = {"Uptime": time.time() - psutil.boot_time(), "Load": " ".join(load)}
+        post_body = {"uptime": time.time() - psutil.boot_time(), "load": " ".join((str(i) for i in load))}
 
         req = await self.session.post(url=self.report_node_stats_api, params={"key": self.mu_key}, json=post_body)
+        if req.status_code != 200:
+            raise APIStatusError(msg=req.status_code)
         result = req.json()
         ret = result["ret"]
         if ret != 1:
@@ -207,6 +209,8 @@ class SSPanelAPI(BaseAPI):
 
     async def fetch_user_list(self) -> List[entities.GenericUser]:
         req = await self.session.get(url=self.fetch_user_list_api, params={"key": self.mu_key, "node_id": self.node_id})
+        if req.status_code != 200:
+            raise APIStatusError(msg=req.status_code)
         result = req.json()
         ret = result["ret"]
         if ret != 1:

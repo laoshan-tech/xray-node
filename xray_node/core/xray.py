@@ -1,11 +1,12 @@
 import asyncio
 import json
-import logging
 from typing import Union
 
 import grpc
+import humanize
 import psutil
 from google.protobuf import message as _message
+from loguru import logger
 from xray_rpc.app.proxyman import config_pb2 as proxyman_config_pb2
 from xray_rpc.app.proxyman.command import (
     command_pb2_grpc as proxyman_command_pb2_grpc,
@@ -35,8 +36,6 @@ from xray_node.exceptions import (
 from xray_node.mdb import models
 from xray_node.utils.consts import NETWORK_DICT, NodeTypeEnum, CIPHER_TYPE_DICT
 from xray_node.utils.install import XrayFile
-
-logger = logging.getLogger(__name__)
 
 
 def to_typed_message(message: _message):
@@ -362,7 +361,7 @@ class Xray(object):
                 )
                 logger.info(f"添加入向代理 {n.inbound_tag} 成功")
             except InboundTagAlreadyExists as e:
-                logger.info(f"入向代理 {e.inbound_tag} 已存在，跳过")
+                logger.debug(f"入向代理 {e.inbound_tag} 已存在，跳过")
             except XrayError as e:
                 logger.exception(f"添加入向代理 {n.inbound_tag} 出错 {e.detail}")
                 continue
@@ -401,7 +400,7 @@ class Xray(object):
                 )
                 logger.info(f"添加用户 {u} 成功")
             except EmailExistsError as e:
-                logger.info(f"用户 {e.email} 已存在，跳过")
+                logger.debug(f"用户 {e.email} 已存在，跳过")
             except XrayError as e:
                 logger.exception(f"添加用户 {u} 出错 {e.detail}")
 
@@ -409,7 +408,9 @@ class Xray(object):
                 user_upload = await self.get_user_upload_traffic(email=u.email, reset=True)
                 user_download = await self.get_user_download_traffic(email=u.email, reset=True)
                 await u.sync_user_traffic(upload=user_upload, download=user_download)
-                logger.info(f"同步用户 {u} 流量成功，上行 {user_upload} 下行 {user_download}")
+                logger.debug(
+                    f"同步用户 {u} 流量成功，上行 {humanize.naturalsize(user_upload)} 下行 {humanize.naturalsize(user_download)}"
+                )
             except XrayError as e:
                 logger.error(e)
                 continue

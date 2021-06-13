@@ -1,19 +1,21 @@
 import asyncio
+import json
 import logging
 import os
+import sys
 from pathlib import Path
 
 import click
 import psutil
+from loguru import logger
 
-from xray_node.api import get_api_cls_by_name
+from xray_node.api import get_api_cls_by_name, entities
 from xray_node.config import Config
 from xray_node.core.xray import Xray
+from xray_node.exceptions import ReportNodeStatsError, APIStatusError
 from xray_node.mdb import init_db, models
 from xray_node.utils.http import client
 from xray_node.utils.install import XrayFile, install_xray, is_xray_installed
-
-logger = logging.getLogger(__name__)
 
 
 class XrayNode(object):
@@ -45,10 +47,8 @@ class XrayNode(object):
             "DEBUG": logging.DEBUG,
         }
         level = log_levels[self.config.log_level.upper()]
-        logging.basicConfig(
-            format="%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)s - %(message)s",
-            level=level,
-        )
+        logger.remove()
+        logger.add(sys.stderr, level=level)
 
     def __init_loop(self) -> None:
         """
@@ -114,8 +114,53 @@ class XrayNode(object):
             cls = get_api_cls_by_name(panel_type=self.config.panel_type)
             self.api_cls = cls(endpoint=self.config.endpoint, mu_key=self.config.api_key, node_id=self.config.node_id)
 
+        node = await self.api_cls.fetch_node_info()
         users = await self.api_cls.fetch_user_list()
+        await models.Node.create_or_update_from_data_list(node_data_list=[node])
         await models.User.create_or_update_from_data_list(user_data_list=users)
+
+    async def __report_stats(self):
+        """
+        向远程同步状态数据
+        :return:
+        """
+        if self.api_cls is None:
+            cls = get_api_cls_by_name(panel_type=self.config.panel_type)
+            self.api_cls = cls(endpoint=self.config.endpoint, mu_key=self.config.api_key, node_id=self.config.node_id)
+
+        try:
+            await self.api_cls.report_node_stats()
+        except APIStatusError as e:
+            logger.error(f"上报节点状态信息API状态码异常 {e.msg}")
+        except ReportNodeStatsError as e:
+            logger.error(f"上报节点状态信息错误 {e.msg}")
+
+        active_users = await models.User.filter_active_users()
+
+        try:
+            await self.api_cls.report_user_stats(
+                stats_data=[
+                    entities.SSPanelOnlineIPData(user_id=u.user_id, ip=json.dumps(list(u.conn_ip_set)))
+                    for u in active_users
+                ]
+            )
+        except APIStatusError as e:
+            logger.error(f"上报用户状态信息API状态码异常 {e.msg}")
+        except ReportNodeStatsError as e:
+            logger.error(f"上报用户状态信息错误 {e.msg}")
+
+        try:
+            await self.api_cls.report_user_traffic(
+                traffic_data=[
+                    entities.SSPanelTrafficData(user_id=u.user_id, upload=u.upload_traffic, download=u.download_traffic)
+                    for u in active_users
+                ]
+            )
+            await models.User.reset_user_traffic()
+        except APIStatusError as e:
+            logger.error(f"上报用户流量信息API状态码异常 {e.msg}")
+        except ReportNodeStatsError as e:
+            logger.error(f"上报用户流量信息错误 {e.msg}")
 
     async def __user_man_cron(self):
         """
@@ -123,16 +168,20 @@ class XrayNode(object):
         :return:
         """
         while True:
-            if self.config.user_mode == "local":
-                logger.info(f"使用本地配置文件 {self.config.fn} 加载用户信息")
-                await self.__sync_user_from_local()
-            elif self.config.user_mode == "remote":
-                logger.info(f"使用远程服务加载用户信息")
-                await self.__sync_user_from_remote()
+            try:
+                if self.config.user_mode == "local":
+                    logger.info(f"使用本地配置文件 {self.config.fn} 加载用户信息")
+                    await self.__sync_user_from_local()
+                elif self.config.user_mode == "remote":
+                    logger.info(f"使用远程服务加载用户信息")
+                    await self.__report_stats()
+                    await self.__sync_user_from_remote()
 
-            await self.xray.sync_data_from_db()
-
-            await asyncio.sleep(60)
+                await self.xray.sync_data_from_db()
+            except Exception as e:
+                logger.exception(f"用户管理出错 {e}")
+            finally:
+                await asyncio.sleep(60)
 
     async def __run_xray(self):
         """

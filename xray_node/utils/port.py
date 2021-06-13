@@ -1,7 +1,6 @@
 import asyncio
-import logging
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 async def check_port_alive(host: str, port: int, timeout: float = 2.0) -> bool:

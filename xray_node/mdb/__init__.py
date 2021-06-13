@@ -1,8 +1,5 @@
-import logging
-
+from loguru import logger
 from tortoise import Tortoise
-
-logger = logging.getLogger(__name__)
 
 
 async def init_db():

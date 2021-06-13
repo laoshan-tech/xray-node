@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any, Union, Type, List, Set
 
+from loguru import logger
 from tortoise import fields
 from tortoise.models import Model
 from tortoise.transactions import atomic
@@ -11,8 +11,6 @@ from tortoise.transactions import atomic
 from xray_node.api import entities
 from xray_node.exceptions import UnsupportedUser, NodeDataNotFound, UnsupportedNode
 from xray_node.utils.consts import NodeTypeEnum
-
-logger = logging.getLogger(__name__)
 
 
 class IPSetField(fields.CharField):
@@ -171,6 +169,14 @@ class User(Model):
         self.download_traffic += download
         self.total_traffic += upload + download
         await self.save()
+
+    @classmethod
+    async def reset_user_traffic(cls) -> None:
+        """
+        重置流量
+        :return:
+        """
+        await User.filter(is_deleted=False).update(upload_traffic=0, download_traffic=0, total_traffic=0)
 
 
 class Node(Model):
