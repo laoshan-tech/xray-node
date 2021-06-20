@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import httpx
-
-client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=10, connect=15))
 from loguru import logger
+
+client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=10, connect=15), headers={"User-Agent": "xray-node"})
 
 
 async def download(url: str, target: Path) -> bool:

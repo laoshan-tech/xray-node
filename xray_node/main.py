@@ -1,11 +1,11 @@
 import asyncio
-import json
 import logging
 import os
 import sys
 from pathlib import Path
 
 import click
+import httpx
 import psutil
 from loguru import logger
 
@@ -140,8 +140,7 @@ class XrayNode(object):
         try:
             await self.api_cls.report_user_stats(
                 stats_data=[
-                    entities.SSPanelOnlineIPData(user_id=u.user_id, ip=json.dumps(list(u.conn_ip_set)))
-                    for u in active_users
+                    entities.SSPanelOnlineIPData(user_id=u.user_id, ip=list(u.conn_ip_set)) for u in active_users
                 ]
             )
         except APIStatusError as e:
@@ -178,6 +177,8 @@ class XrayNode(object):
                     await self.__sync_user_from_remote()
 
                 await self.xray.sync_data_from_db()
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                logger.error(f"请求远程服务出错 {e}")
             except Exception as e:
                 logger.exception(f"用户管理出错 {e}")
             finally:

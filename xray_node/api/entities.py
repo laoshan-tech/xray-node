@@ -71,7 +71,7 @@ class TrojanNode(GenericNode):
 @dataclass
 class SSPanelOnlineIPData(object):
     user_id: int
-    ip: str
+    ip: list
 
 
 @dataclass

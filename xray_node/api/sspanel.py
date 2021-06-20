@@ -64,7 +64,7 @@ class SSPanelAPI(BaseAPI):
         :return:
         """
         load = psutil.getloadavg()
-        post_body = {"uptime": time.time() - psutil.boot_time(), "load": " ".join((str(i) for i in load))}
+        post_body = {"uptime": time.time() - psutil.boot_time(), "load": " ".join(("%.2f" % i for i in load))}
 
         req = await self.session.post(url=self.report_node_stats_api, params={"key": self.mu_key}, json=post_body)
         if req.status_code != 200:
@@ -303,7 +303,11 @@ class SSPanelAPI(BaseAPI):
         :param stats_data:
         :return:
         """
-        post_body = {"data": [{"ip": d.ip, "user_id": d.user_id} for d in stats_data]}
+        ds = []
+        for d in stats_data:
+            ds.extend([{"ip": ip, "user_id": d.user_id} for ip in d.ip])
+        post_body = {"data": ds}
+
         req = await self.session.post(
             url=self.report_user_online_ip_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
         )
