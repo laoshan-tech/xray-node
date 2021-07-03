@@ -6,7 +6,7 @@ import psutil
 from loguru import logger
 
 from xray_node.api import BaseAPI, entities
-from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError, ReportUserTrafficError, APIStatusError
+from xray_node.exceptions import FetchNodeInfoError, ReportNodeStatsError, ReportUserTrafficError
 from xray_node.utils.consts import SSPANEL_NODE_TYPE, NodeTypeEnum
 
 
@@ -23,9 +23,9 @@ class SSPanelAPI(BaseAPI):
         self.node = None
         self.node_type = None
         self.multi_user: Union[None, entities.SSUser] = None
-        self.__prepare_api()
+        self._prepare_api()
 
-    def __prepare_api(self) -> None:
+    def _prepare_api(self) -> None:
         self.fetch_node_info_api = urljoin(base=self.endpoint, url=f"/mod_mu/nodes/{self.node_id}/info")
         self.fetch_user_list_api = urljoin(base=self.endpoint, url=f"/mod_mu/users")
         self.report_node_stats_api = urljoin(base=self.endpoint, url=f"/mod_mu/nodes/{self.node_id}/info")
@@ -36,9 +36,7 @@ class SSPanelAPI(BaseAPI):
         self,
     ) -> Union[entities.SSNode, entities.VMessNode, entities.VLessNode, entities.TrojanNode]:
         req = await self.session.get(url=self.fetch_node_info_api, params={"key": self.mu_key})
-        if req.status_code != 200:
-            raise APIStatusError(msg=req.status_code)
-        result = req.json()
+        result = self.parse_resp(req=req)
         ret = result["ret"]
         if ret != 1:
             raise FetchNodeInfoError(msg=result["data"])
@@ -67,9 +65,7 @@ class SSPanelAPI(BaseAPI):
         post_body = {"uptime": time.time() - psutil.boot_time(), "load": " ".join(("%.2f" % i for i in load))}
 
         req = await self.session.post(url=self.report_node_stats_api, params={"key": self.mu_key}, json=post_body)
-        if req.status_code != 200:
-            raise APIStatusError(msg=req.status_code)
-        result = req.json()
+        result = self.parse_resp(req=req)
         ret = result["ret"]
         if ret != 1:
             raise ReportNodeStatsError(msg=result["data"])
@@ -209,14 +205,12 @@ class SSPanelAPI(BaseAPI):
 
     async def fetch_user_list(self) -> List[entities.GenericUser]:
         req = await self.session.get(url=self.fetch_user_list_api, params={"key": self.mu_key, "node_id": self.node_id})
-        if req.status_code != 200:
-            raise APIStatusError(msg=req.status_code)
-        result = req.json()
+        result = self.parse_resp(req=req)
         ret = result["ret"]
         if ret != 1:
             raise FetchNodeInfoError(msg=result["data"])
 
-        user_data = req.json()["data"]
+        user_data = result["data"]
         if len(user_data) > 0:
             logger.info(f"获取用户信息成功，本次获取到 {len(user_data)} 个用户信息")
             users = [self.parse_user(data=u) for u in user_data]
@@ -311,7 +305,7 @@ class SSPanelAPI(BaseAPI):
         req = await self.session.post(
             url=self.report_user_online_ip_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
         )
-        result = req.json()
+        result = self.parse_resp(req=req)
         ret = result["ret"]
         if ret != 1:
             raise ReportNodeStatsError(msg=result["data"])
@@ -328,7 +322,7 @@ class SSPanelAPI(BaseAPI):
         req = await self.session.post(
             url=self.report_user_traffic_api, params={"key": self.mu_key, "node_id": self.node_id}, json=post_body
         )
-        result = req.json()
+        result = self.parse_resp(req=req)
         ret = result["ret"]
         if ret != 1:
             raise ReportUserTrafficError(msg=result["data"])

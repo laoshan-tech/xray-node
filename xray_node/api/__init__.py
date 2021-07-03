@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from json import JSONDecodeError
 from typing import Union, Type, TYPE_CHECKING
 
-from xray_node.exceptions import UnsupportedAPI
+import httpx
+from loguru import logger
+
+from xray_node.exceptions import UnsupportedAPI, APIStatusError, APIContentError
 from xray_node.utils import http
 
 if TYPE_CHECKING:
@@ -22,14 +26,30 @@ class BaseAPI(object):
         self.fetch_user_list_api = ""
         self.report_user_online_ip_api = ""
 
-        self.__prepare_api()
-
-    def __prepare_api(self) -> None:
+    def _prepare_api(self) -> None:
         """
         拼装API地址
         :return:
         """
-        pass
+        return
+
+    @staticmethod
+    def parse_resp(req: httpx.Response) -> dict:
+        """
+        解析响应包
+        :param req:
+        :return:
+        """
+        if req.status_code >= 400:
+            logger.error(f"请求 {req.url} 出错，响应详情 {req.text}")
+            raise APIStatusError(msg=req.status_code)
+        else:
+            try:
+                d = req.json()
+                return d
+            except JSONDecodeError:
+                logger.error(f"请求 {req.url} 解析JSON失败，响应详情 {req.text}")
+                raise APIContentError(msg=req.text)
 
     async def fetch_user_list(self) -> list:
         """

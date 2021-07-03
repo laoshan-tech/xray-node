@@ -63,6 +63,11 @@ class APIStatusError(APIError):
         super(APIStatusError, self).__init__(msg=msg)
 
 
+class APIContentError(APIError):
+    def __init__(self, msg):
+        super(APIContentError, self).__init__(msg=msg)
+
+
 class UnsupportedAPI(APIError):
     def __init__(self, msg):
         super(UnsupportedAPI, self).__init__(msg=msg)
