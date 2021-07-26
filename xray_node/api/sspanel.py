@@ -15,9 +15,9 @@ class SSPanelAPI(BaseAPI):
     SSPanel
     """
 
-    def __init__(self, endpoint: str, mu_key: str, node_id: int):
+    def __init__(self, endpoint: str, api_key: str, node_id: int):
         super(SSPanelAPI, self).__init__(endpoint=endpoint)
-        self.mu_key = mu_key
+        self.mu_key = api_key
         self.node_id = node_id
 
         self.node = None

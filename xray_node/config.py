@@ -25,6 +25,7 @@ mode = "local" # local/remote
 
 [panel]
 type = "sspanel" # sspanel/v2board/django-sspanel
+protocol = "vmess"
 endpoint = "http://xxx.xxxx.com/"
 node_id = 1
 api_key = "key"
@@ -104,6 +105,7 @@ class Config(object):
         self.user_mode = self.content["user"]["mode"]
         if self.user_mode == "remote":
             self.panel_type = self.content["panel"]["type"]
+            self.node_type = self.content["panel"]["protocol"]
             self.endpoint = self.content["panel"]["endpoint"]
             self.api_key = self.content["panel"]["api_key"]
             self.node_id = self.content["panel"]["node_id"]

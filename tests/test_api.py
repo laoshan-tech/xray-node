@@ -16,7 +16,7 @@ class TestSSPanel(object):
     )
     trojan_server = "gz.aaa.com;port=443#12345|host=hk.aaa.com"
 
-    api = SSPanelAPI(endpoint=f"http://127.0.0.1:{HTTPServer.DEFAULT_LISTEN_PORT}/", mu_key="sspanel_test", node_id=2)
+    api = SSPanelAPI(endpoint=f"http://127.0.0.1:{HTTPServer.DEFAULT_LISTEN_PORT}/", api_key="sspanel_test", node_id=2)
 
     def test_parse_ss(self):
         node = self.api.parse_ss(raw_data=self.ss_server)

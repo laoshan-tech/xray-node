@@ -1,3 +1,4 @@
+from typing import Union
 from urllib.parse import urljoin, urlparse
 
 from loguru import logger
@@ -7,10 +8,15 @@ from xray_node.exceptions import UnsupportedNode
 
 
 class V2BoardAPI(BaseAPI):
-    def __init__(self, endpoint: str, node_type: str, node_id: int):
+    def __init__(self, endpoint: str, node_type: str, api_key: str, node_id: int):
         super(V2BoardAPI, self).__init__(endpoint=endpoint)
-        self.node_type = node_type
         self.node_id = node_id
+        self.token = api_key
+
+        self.node = None
+        self.node_type = node_type
+        self.multi_user: Union[None, entities.SSUser] = None
+        self._prepare_api()
 
     def _prepare_api(self) -> None:
         if self.node_type == "V2ray":
@@ -25,22 +31,96 @@ class V2BoardAPI(BaseAPI):
         else:
             raise UnsupportedNode(msg=self.node_type)
 
-    def fetch_node_info(self):
-        req = await self.session.get(self.fetch_node_info_api, params={"node_id": self.node_id})
+    async def fetch_node_info(self):
+        req = await self.session.get(
+            self.fetch_node_info_api, params={"node_id": self.node_id, "token": self.token, "local_port": 1}
+        )
         result = self.parse_resp(req=req)
 
+        if self.node_type == "V2ray":
+            self.node = self.parse_vmess(result)
+        elif self.node_type == "Shadowsocks":
+            self.node = self.parse_ss(result)
+        elif self.node_type == "Trojan":
+            self.node = self.parse_trojan(result)
+        else:
+            pass
+
+    def handle_multi_user(self):
+        """
+        v2board节点部分信息保存在用户数据中
+        :return:
+        """
+        if self.multi_user and self.node_type == "Shadowsocks" and self.node:
+            self.node.listen_port = self.multi_user.listen_port
+            self.node.method = self.multi_user.method
+        else:
+            logger.debug("不满足合并单端口承载用户信息条件，跳过")
+
+    def parse_ss(self, raw_data: dict) -> entities.SSNode:
+        node = entities.SSNode(
+            node_id=self.node_id,
+            panel_name=urlparse(self.endpoint).netloc,
+            listen_port=0,
+            listen_host="0.0.0.0",
+        )
+        return node
+
+    def parse_vmess(self, raw_data: dict) -> entities.VMessNode:
+        inbound_info = raw_data.get("inbound", {})
+        port = inbound_info.get("port", 0)
+        transport = inbound_info.get("streamSettings", {}).get("network", "")
+        enable_tls = inbound_info.get("streamSettings", {}).get("security") == "tls"
+
+        host, path = "", ""
+        if transport == "ws":
+            host = inbound_info.get("streamSettings", {}).get("wsSettings", {}).get("headers", "")
+            path = inbound_info.get("streamSettings", {}).get("wsSettings", {}).get("path", "")
+
+        node = entities.VMessNode(
+            node_id=self.node_id,
+            panel_name=urlparse(self.endpoint).netloc,
+            listen_host="0.0.0.0",
+            listen_port=port,
+            alter_id=0,
+            transport=transport,
+            enable_tls=enable_tls,
+            tls_type="tls",
+            host=host,
+            path=path,
+        )
+        return node
+
+    def parse_trojan(self, raw_data: dict) -> entities.TrojanNode:
+        host = raw_data.get("ssl", {}).get("sni", "")
+        port = raw_data.get("local_port", 0)
+
+        node = entities.TrojanNode(
+            node_id=self.node_id,
+            panel_name=urlparse(self.endpoint).netloc,
+            listen_port=port,
+            listen_host="0.0.0.0",
+            host=host,
+            enable_xtls=False,
+            enable_vless=False,
+        )
+        return node
+
     async def fetch_user_list(self) -> list:
-        req = await self.session.get(self.fetch_user_list_api, params={"node_id": self.node_id})
+        req = await self.session.get(
+            self.fetch_user_list_api, params={"node_id": self.node_id, "token": self.token, "local_port": 1}
+        )
         result = self.parse_resp(req=req)
 
         user_data = result["data"]
         if len(user_data) > 0:
             logger.info(f"获取用户信息成功，本次获取到 {len(user_data)} 个用户信息")
-            users = [self.parse_user(data=u) for u in user_data]
+            users = [self.parse_user(data=u, idx=idx) for idx, u in enumerate(user_data)]
         else:
             logger.warning(f"未获取到有效用户")
             users = []
 
+        self.handle_multi_user()
         return users
 
     def report_user_stats(self, stats_data: list) -> bool:
@@ -49,7 +129,7 @@ class V2BoardAPI(BaseAPI):
     def report_user_traffic(self, traffic_data: list) -> bool:
         pass
 
-    def parse_user(self, data: dict):
+    def parse_user(self, data: dict, idx: int = 0):
         uid = data.get("id", -1)
         email = data.get("email", f"{uid}@{urlparse(self.endpoint).netloc}")
         speed_limit = 0
@@ -64,12 +144,12 @@ class V2BoardAPI(BaseAPI):
                 node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
-                password=data.get("passwd", ""),
-                method=data.get("method"),
-                is_multi_user=data.get("is_multi_user", 0),
+                password=data.get("secret", ""),
+                method=data.get("cipher"),
+                is_multi_user=idx == 0,
                 listen_port=data.get("port", 0),
             )
-            if user.is_multi_user > 0 and self.multi_user is None:
+            if idx == 0 and self.multi_user is None:
                 self.multi_user = user
 
         elif self.node_type == "V2ray":
@@ -79,8 +159,10 @@ class V2BoardAPI(BaseAPI):
                 node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
-                uuid=data.get("uuid", ""),
+                uuid=data.get("trojan_user", {}).get("uuid", ""),
             )
+            if idx == 0:
+                self.node.alter_id = data.get("alter_id", 0)
         elif self.node_type == "Trojan":
             user = entities.TrojanUser(
                 user_id=uid,
@@ -88,7 +170,7 @@ class V2BoardAPI(BaseAPI):
                 node_id=self.node.node_id,
                 email=email,
                 speed_limit=speed_limit,
-                uuid=data.get("uuid", ""),
+                uuid=data.get("v2ray_user", {}).get("uuid", ""),
             )
         else:
             raise

@@ -3,13 +3,14 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Union
 
 import click
 import httpx
 import psutil
 from loguru import logger
 
-from xray_node.api import get_api_cls_by_name, entities
+from xray_node.api import get_api_cls_by_name, entities, sspanel, v2board
 from xray_node.config import Config
 from xray_node.core.xray import Xray
 from xray_node.exceptions import ReportNodeStatsError, APIStatusError
@@ -105,17 +106,22 @@ class XrayNode(object):
         await models.Node.create_or_update_from_data_list(node_data_list=nodes)
         await models.User.create_or_update_from_data_list(user_data_list=users)
 
+    def __get_api_cls(self) -> Union[sspanel.SSPanelAPI, v2board.V2BoardAPI]:
+        if self.api_cls is None:
+            cls = get_api_cls_by_name(panel_type=self.config.panel_type)
+            self.api_cls = cls(endpoint=self.config.endpoint, api_key=self.config.api_key, node_id=self.config.node_id)
+
+        return self.api_cls
+
     async def __sync_user_from_remote(self):
         """
         远程模式同步用户
         :return:
         """
-        if self.api_cls is None:
-            cls = get_api_cls_by_name(panel_type=self.config.panel_type)
-            self.api_cls = cls(endpoint=self.config.endpoint, mu_key=self.config.api_key, node_id=self.config.node_id)
+        api_cls = self.__get_api_cls()
 
-        node = await self.api_cls.fetch_node_info()
-        users = await self.api_cls.fetch_user_list()
+        node = await api_cls.fetch_node_info()
+        users = await api_cls.fetch_user_list()
         await models.Node.create_or_update_from_data_list(node_data_list=[node])
         await models.User.create_or_update_from_data_list(user_data_list=users)
 
@@ -124,12 +130,10 @@ class XrayNode(object):
         向远程同步状态数据
         :return:
         """
-        if self.api_cls is None:
-            cls = get_api_cls_by_name(panel_type=self.config.panel_type)
-            self.api_cls = cls(endpoint=self.config.endpoint, mu_key=self.config.api_key, node_id=self.config.node_id)
+        api_cls = self.__get_api_cls()
 
         try:
-            await self.api_cls.report_node_stats()
+            await api_cls.report_node_stats()
         except APIStatusError as e:
             logger.error(f"上报节点状态信息API状态码异常 {e.msg}")
         except ReportNodeStatsError as e:
@@ -138,7 +142,7 @@ class XrayNode(object):
         active_users = await models.User.filter_active_users()
 
         try:
-            await self.api_cls.report_user_stats(
+            await api_cls.report_user_stats(
                 stats_data=[
                     entities.SSPanelOnlineIPData(user_id=u.user_id, ip=list(u.conn_ip_set)) for u in active_users
                 ]
@@ -149,7 +153,7 @@ class XrayNode(object):
             logger.error(f"上报用户状态信息错误 {e.msg}")
 
         try:
-            await self.api_cls.report_user_traffic(
+            await api_cls.report_user_traffic(
                 traffic_data=[
                     entities.SSPanelTrafficData(user_id=u.user_id, upload=u.upload_traffic, download=u.download_traffic)
                     for u in active_users
