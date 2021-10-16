@@ -2,7 +2,7 @@
 name = "xray-node"
 version = "0.0.1"
 description = ""
-authors = ["laoshan-taoist <65347330+laoshan-taoist@users.noreply.github.com>"]
+authors = ["guyue-ls <laoshan-tech@yandex.com>"]
 license = "AGPLv3"
 packages = [
     { include = "xray_node" },

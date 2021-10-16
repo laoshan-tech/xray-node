@@ -142,5 +142,8 @@ cython_debug/
 # IDE
 .idea/
 
+# MacOS
+.DS_Store
+
 # Custom
 xnode.toml
