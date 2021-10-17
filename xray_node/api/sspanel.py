@@ -15,13 +15,11 @@ class SSPanelAPI(BaseAPI):
     SSPanel
     """
 
-    def __init__(self, endpoint: str, api_key: str, node_id: int):
-        super(SSPanelAPI, self).__init__(endpoint=endpoint)
-        self.mu_key = api_key
-        self.node_id = node_id
+    def __init__(self, endpoint: str, node_id: int, api_key: str):
+        super(SSPanelAPI, self).__init__(endpoint=endpoint, node_id=node_id, api_key=api_key, node_type=None)
+        self.mu_key = self.api_key
 
         self.node = None
-        self.node_type = None
         self.multi_user: Union[None, entities.SSUser] = None
         self._prepare_api()
 

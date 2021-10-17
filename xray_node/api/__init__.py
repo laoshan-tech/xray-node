@@ -21,8 +21,11 @@ class BaseAPI(object):
 
     session = http.client
 
-    def __init__(self, endpoint: str = ""):
+    def __init__(self, endpoint: str, node_id: int, api_key: str, node_type: Union[str, None]):
         self.endpoint = endpoint
+        self.node_id = node_id
+        self.api_key = api_key
+        self.node_type = node_type
         self.fetch_user_list_api = ""
         self.report_user_online_ip_api = ""
 

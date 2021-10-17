@@ -1,33 +1,37 @@
-from typing import Union
+from typing import Union, List
 from urllib.parse import urljoin, urlparse
 
 from loguru import logger
 
 from xray_node.api import BaseAPI, entities
-from xray_node.exceptions import UnsupportedNode
+from xray_node.exceptions import UnsupportedNode, ReportUserTrafficError
 
 
 class V2BoardAPI(BaseAPI):
-    def __init__(self, endpoint: str, node_type: str, api_key: str, node_id: int):
-        super(V2BoardAPI, self).__init__(endpoint=endpoint)
-        self.node_id = node_id
-        self.token = api_key
+    def __init__(self, endpoint: str, node_id: int, api_key: str, node_type: str):
+        super(V2BoardAPI, self).__init__(endpoint=endpoint, node_id=node_id, api_key=api_key, node_type=node_type)
+        self.token = self.api_key
 
         self.node = None
-        self.node_type = node_type
         self.multi_user: Union[None, entities.SSUser] = None
         self._prepare_api()
 
     def _prepare_api(self) -> None:
-        if self.node_type == "V2ray":
+        # V2ray
+        if self.node_type in ("vmess", "vless"):
             self.fetch_user_list_api = urljoin(self.endpoint, "/api/v1/server/Deepbwork/user")
             self.fetch_node_info_api = urljoin(self.endpoint, "/api/v1/server/Deepbwork/config")
-        elif self.node_type == "Shadowsocks":
+            self.report_user_traffic_api = urljoin(self.endpoint, "/api/v1/server/Deepbwork/submit")
+        # Shadowsocks
+        elif self.node_type == "shadowsocks":
             self.fetch_user_list_api = urljoin(self.endpoint, "/api/v1/server/ShadowsocksTidalab/user")
             self.fetch_node_info_api = urljoin(self.endpoint, "")
-        elif self.node_type == "Trojan":
+            self.report_user_traffic_api = urljoin(self.endpoint, "/api/v1/server/ShadowsocksTidalab/submit")
+        # Trojan
+        elif self.node_type == "trojan":
             self.fetch_user_list_api = urljoin(self.endpoint, "/api/v1/server/TrojanTidalab/user")
             self.fetch_node_info_api = urljoin(self.endpoint, "/api/v1/server/TrojanTidalab/config")
+            self.report_user_traffic_api = urljoin(self.endpoint, "/api/v1/server/TrojanTidalab/submit")
         else:
             raise UnsupportedNode(msg=self.node_type)
 
@@ -37,21 +41,26 @@ class V2BoardAPI(BaseAPI):
         )
         result = self.parse_resp(req=req)
 
-        if self.node_type == "V2ray":
+        if self.node_type in ("vmess", "vless"):
             self.node = self.parse_vmess(result)
-        elif self.node_type == "Shadowsocks":
+        elif self.node_type == "shadowsocks":
             self.node = self.parse_ss(result)
-        elif self.node_type == "Trojan":
+        elif self.node_type == "trojan":
             self.node = self.parse_trojan(result)
         else:
-            pass
+            raise UnsupportedNode(msg=self.node_type)
+
+        return self.node
+
+    async def report_node_stats(self):
+        return
 
     def handle_multi_user(self):
         """
         v2board节点部分信息保存在用户数据中
         :return:
         """
-        if self.multi_user and self.node_type == "Shadowsocks" and self.node:
+        if self.multi_user and self.node_type == "shadowsocks" and self.node:
             self.node.listen_port = self.multi_user.listen_port
             self.node.method = self.multi_user.method
         else:
@@ -123,11 +132,20 @@ class V2BoardAPI(BaseAPI):
         self.handle_multi_user()
         return users
 
-    def report_user_stats(self, stats_data: list) -> bool:
+    async def report_user_stats(self, stats_data: list) -> bool:
         pass
 
-    def report_user_traffic(self, traffic_data: list) -> bool:
-        pass
+    async def report_user_traffic(self, traffic_data: List[entities.V2BoardTrafficData]) -> bool:
+        post_body = [{"user_id": d.user_id, "u": d.upload, "d": d.download} for d in traffic_data]
+        req = await self.session.post(
+            url=self.report_user_traffic_api, params={"node_id": self.node_id, "token": self.token}, json=post_body
+        )
+        result = self.parse_resp(req=req)
+        ret = result["ret"]
+        if ret != 1:
+            raise ReportUserTrafficError(msg=result["data"])
+        else:
+            return True
 
     def parse_user(self, data: dict, idx: int = 0):
         uid = data.get("id", -1)
@@ -137,7 +155,7 @@ class V2BoardAPI(BaseAPI):
         if self.node_type is None:
             raise Exception("节点信息未获取")
 
-        if self.node_type == "Shadowsocks":
+        if self.node_type == "shadowsocks":
             user = entities.SSUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
@@ -152,7 +170,7 @@ class V2BoardAPI(BaseAPI):
             if idx == 0 and self.multi_user is None:
                 self.multi_user = user
 
-        elif self.node_type == "V2ray":
+        elif self.node_type in ("vmess", "vless"):
             user = entities.VMessUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,
@@ -163,7 +181,7 @@ class V2BoardAPI(BaseAPI):
             )
             if idx == 0:
                 self.node.alter_id = data.get("alter_id", 0)
-        elif self.node_type == "Trojan":
+        elif self.node_type == "trojan":
             user = entities.TrojanUser(
                 user_id=uid,
                 panel_name=self.node.panel_name,

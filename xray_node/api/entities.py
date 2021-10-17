@@ -79,3 +79,10 @@ class SSPanelTrafficData(object):
     user_id: int
     upload: int
     download: int
+
+
+@dataclass
+class V2BoardTrafficData(object):
+    user_id: int
+    upload: int
+    download: int

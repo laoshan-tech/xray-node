@@ -109,7 +109,12 @@ class XrayNode(object):
     def __get_api_cls(self) -> Union[sspanel.SSPanelAPI, v2board.V2BoardAPI]:
         if self.api_cls is None:
             cls = get_api_cls_by_name(panel_type=self.config.panel_type)
-            self.api_cls = cls(endpoint=self.config.endpoint, api_key=self.config.api_key, node_id=self.config.node_id)
+            self.api_cls = cls(
+                endpoint=self.config.endpoint,
+                api_key=self.config.api_key,
+                node_id=self.config.node_id,
+                node_type=self.config.node_type,
+            )
 
         return self.api_cls
 
