@@ -35,8 +35,8 @@ pytest-asyncio = "^0.14.0"
 pytest-ordering = "^0.6"
 
 [[tool.poetry.source]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
 default = true
 
 [tool.poetry.scripts]
